@@ -66,7 +66,7 @@ public class GoKnownStrings extends GhidraScript {
     static {
         KNOWN_STRINGS = new ArrayList<>();
         try {
-            ResourceFile resourceFile = Application.getModuleFile("Ghostrings", "data/known_strings.json");
+            ResourceFile resourceFile = Application.getModuleDataFile("Ghostrings", "known_strings.json");
             Reader reader = new InputStreamReader(resourceFile.getInputStream());
             Gson gson = new Gson();
 
@@ -145,7 +145,7 @@ public class GoKnownStrings extends GhidraScript {
 
     @Override
     protected void run() throws Exception {
-        if (KNOWN_STRINGS.size() == 0) {
+        if (KNOWN_STRINGS.isEmpty()) {
             println("Failed to load known string data");
             return;
         }
