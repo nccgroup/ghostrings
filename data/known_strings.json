@@ -1,0 +1,167 @@
+[
+  {
+    "name": "strconv/itoa.go:smallsString",
+    "value": "00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899",
+    "comment": "This 200 byte string from strconv/itoa.go is often near the end of go.string."
+  },
+  {
+    "name": "strconv/itoa.go:digits",
+    "value": "0123456789abcdefghijklmnopqrstuvwxyz"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_22",
+    "value": "2384185791015625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_23",
+    "value": "11920928955078125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_24",
+    "value": "59604644775390625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_25",
+    "value": "298023223876953125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_26",
+    "value": "1490116119384765625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_27",
+    "value": "7450580596923828125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_28",
+    "value": "37252902984619140625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_29",
+    "value": "186264514923095703125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_30",
+    "value": "931322574615478515625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_31",
+    "value": "4656612873077392578125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_32",
+    "value": "23283064365386962890625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_33",
+    "value": "116415321826934814453125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_34",
+    "value": "582076609134674072265625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_35",
+    "value": "2910383045673370361328125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_36",
+    "value": "14551915228366851806640625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_37",
+    "value": "72759576141834259033203125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_38",
+    "value": "363797880709171295166015625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_39",
+    "value": "1818989403545856475830078125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_40",
+    "value": "9094947017729282379150390625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_41",
+    "value": "45474735088646411895751953125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_42",
+    "value": "227373675443232059478759765625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_43",
+    "value": "1136868377216160297393798828125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_44",
+    "value": "5684341886080801486968994140625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_45",
+    "value": "28421709430404007434844970703125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_46",
+    "value": "142108547152020037174224853515625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_47",
+    "value": "710542735760100185871124267578125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_48",
+    "value": "3552713678800500929355621337890625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_49",
+    "value": "17763568394002504646778106689453125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_50",
+    "value": "88817841970012523233890533447265625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_51",
+    "value": "444089209850062616169452667236328125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_52",
+    "value": "2220446049250313080847263336181640625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_53",
+    "value": "11102230246251565404236316680908203125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_54",
+    "value": "55511151231257827021181583404541015625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_55",
+    "value": "277555756156289135105907917022705078125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_56",
+    "value": "1387778780781445675529539585113525390625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_57",
+    "value": "6938893903907228377647697925567626953125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_58",
+    "value": "34694469519536141888238489627838134765625"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_59",
+    "value": "173472347597680709441192448139190673828125"
+  },
+  {
+    "name": "strconv/decimal.go:leftcheats_60",
+    "value": "867361737988403547205962240695953369140625"
+  }
+]
