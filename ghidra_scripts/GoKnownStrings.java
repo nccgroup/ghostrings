@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 //Searches for standard unique strings and defines them.
+//String data is loaded from data/known_strings.json.
 //@author James Chambers <james.chambers@nccgroup.com>
 //@category Golang
 //@keybinding

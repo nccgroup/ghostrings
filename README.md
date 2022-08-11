@@ -63,7 +63,7 @@ These can be found in the Golang category in the Script Manager.
 * `GoDynamicStringsHigh.java`
   * Experimental, uses P-Code output from the higher level "normalize" style analysis. Currently depends on a hack that turns off deadcode elimination in the decompiler.
 * `GoKnownStrings.java`
-  * Searches for standard unique strings and defines them.
+  * Searches for standard unique strings and defines them. String data is loaded from `data/known_strings.json`.
 * `GoStringFiller.java`
   * Fills in gaps in `go.string.*` after initial analysis, based on strings being ordered by ascending length.
 
