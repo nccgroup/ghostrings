@@ -9,6 +9,14 @@
     "value": "0123456789abcdefghijklmnopqrstuvwxyz"
   },
   {
+    "name": "runtime/lock_sema.go:lock2_throw",
+    "value": "runtime\u00b7lock: lock count"
+  },
+  {
+    "name": "runtime/lock_sema.go:unlock2_throw",
+    "value": "runtime\u00b7unlock: lock count"
+  },
+  {
     "name": "strconv/decimal.go:leftcheats_22",
     "value": "2384185791015625"
   },
