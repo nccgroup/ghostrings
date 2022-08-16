@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 //Fill in undefined strings based on the fact that they are defined in order of increasing length.
-//For a stripped binary, one should first manually create the go.string.* label at the likely start location.
+//For a stripped binary, one should first manually create the go.string.* (or _go.string.* in Mach-O) label at the likely start location.
 //@author James Chambers <james.chambers@nccgroup.com>
 //@category Golang
 //@keybinding
@@ -35,6 +35,7 @@ import ghidra.program.model.listing.Data;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.StringUtilities;
+import ghostrings.GhostringsUtil;
 
 public class GoStringFiller extends GhidraScript {
 
@@ -296,9 +297,11 @@ public class GoStringFiller extends GhidraScript {
 
     @Override
     protected void run() throws Exception {
-        List<Symbol> results = getSymbols("go.string.*", null);
+        final String goStringSym = GhostringsUtil.goStringSymbol(currentProgram);
+        List<Symbol> results = getSymbols(goStringSym, null);
         if (results.size() != 1) {
-            final String msg = "Want a single go.string.* symbol, found " + results.size();
+            final String msg = String.format(
+                    "Want a single %s symbol, found %d", goStringSym, results.size());
             println(msg);
             popup(msg);
             return;
@@ -316,7 +319,7 @@ public class GoStringFiller extends GhidraScript {
                 "which could result in false positives?");
 
         Symbol goStringsBlob = results.get(0);
-        println("go.string.* @ " + goStringsBlob.getAddress());
+        printf("%s @ %s\n", goStringSym, goStringsBlob.getAddress());
 
         Address curAddr = goStringsBlob.getAddress();
         while (!monitor.isCancelled()) {

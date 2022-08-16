@@ -79,7 +79,7 @@ This can be found in the PCode category in the Script Manager.
 
 Here’s the general flow for using these scripts to recover string definitions in a Go binary:
 
-1. Clear all automatically defined strings in the `.rodata` (ELF) or `.rdata` (PE) memory block. The goal is to eliminate incorrect string definitions caused by the lack of null terminators.
+1. To eliminate incorrect string definitions, clear all automatically defined strings in the read-only data memory block (`.rodata`, `.rdata`, or `__rodata`).
    1. In the "Defined Strings" window, add the "Mem Block" column to the display
    2. Create a filter on the memory block column to only show strings in the target block
    3. Select all strings in the window, then in the listing right-click and choose "Clear Code Bytes"

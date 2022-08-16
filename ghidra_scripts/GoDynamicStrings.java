@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 //Find Go strings dynamically allocated on the stack (P-Code based).
-//Clearing out all automatically defined strings in .rodata/.rdata first is recommended.
+//Clearing out all automatically defined strings in .rodata/.rdata/__rodata first is recommended.
 //The built-in ASCII Strings analysis can then be run again afterwards,
 //with the option to clear existing strings disabled.
 //
@@ -77,8 +77,9 @@ public class GoDynamicStrings extends GhidraScript {
     protected final static Set<String> STR_MEM_BLOCKS;
     static {
         STR_MEM_BLOCKS = new HashSet<>();
-        STR_MEM_BLOCKS.add(".rodata");
-        STR_MEM_BLOCKS.add(".rdata");
+        STR_MEM_BLOCKS.add(".rodata"); // ELF
+        STR_MEM_BLOCKS.add(".rdata"); // PE
+        STR_MEM_BLOCKS.add("__rodata"); // Mach-O
     }
 
     protected int verbose;

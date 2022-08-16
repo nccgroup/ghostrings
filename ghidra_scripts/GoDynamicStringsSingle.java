@@ -2,7 +2,7 @@
 //Use this if the parallel decompiler is exhausting system memory.
 //
 //Find Go strings dynamically allocated on the stack (P-Code based).
-//Clearing out all automatically defined strings in .rodata/.rdata first is recommended.
+//Clearing out all automatically defined strings in .rodata/.rdata/__rodata first is recommended.
 //The built-in ASCII Strings analysis can then be run again afterwards,
 //with the option to clear existing strings disabled.
 //

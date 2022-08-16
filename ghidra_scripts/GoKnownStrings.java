@@ -43,6 +43,7 @@ import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.StringUtilities;
+import ghostrings.GhostringsUtil;
 
 public class GoKnownStrings extends GhidraScript {
 
@@ -179,9 +180,11 @@ public class GoKnownStrings extends GhidraScript {
             return;
         }
 
-        List<Symbol> results = getSymbols("go.string.*", null);
+        final String goStringSym = GhostringsUtil.goStringSymbol(currentProgram);
+        List<Symbol> results = getSymbols(goStringSym, null);
         if (results.size() != 1) {
-            final String msg = "Want a single go.string.* symbol, found " + results.size();
+            final String msg = String.format(
+                    "Want a single %s symbol, found %d", goStringSym, results.size());
             println(msg);
             popup(msg);
             return;
@@ -189,7 +192,7 @@ public class GoKnownStrings extends GhidraScript {
 
         Symbol goStringsBlob = results.get(0);
         Address blobAddr = goStringsBlob.getAddress();
-        println("go.string.* @ " + blobAddr);
+        printf("%s @ %s\n", goStringSym, blobAddr);
 
         for (KnownString knownString : KNOWN_STRINGS) {
             Data strData = findAndDefineString(blobAddr, knownString.value);

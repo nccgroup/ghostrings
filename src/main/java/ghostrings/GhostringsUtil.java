@@ -56,6 +56,16 @@ public class GhostringsUtil {
         // No instantiation
     }
 
+    public static String goStringSymbol(Program program) {
+        if ("Mac OS X Mach-O".equals(program.getExecutableFormat())) {
+            // Mach-O uses `_go.string.*`
+            return "_go.string.*";
+        }
+
+        // ELF/PE use `go.string.*`
+        return "go.string.*";
+    }
+
     public static String getFuncName(Function func) {
         if (func.getName() != null)
             return func.getName();
