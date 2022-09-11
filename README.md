@@ -61,7 +61,7 @@ These can be found in the Golang category in the Script Manager.
 * `GoDynamicStringsSingle.java`
   * Performs the same analysis as `GoDynamicStrings.java`, but uses a single decompiler process. Use this if analyzing a large binary causes the parallel decompiler processes to exhaust system memory.
 * `GoDynamicStringsHigh.java`
-  * Experimental, uses P-Code output from the higher level "normalize" style analysis. Currently depends on a hack that turns off deadcode elimination in the decompiler.
+  * Experimental, uses P-Code output from the higher level "normalize" style analysis. Currently depends on a hack that turns off deadcode elimination in the decompiler (see <https://research.nccgroup.com/2022/05/20/earlyremoval-in-the-conservatory-with-the-wrench/>).
 * `GoKnownStrings.java`
   * Searches for standard unique strings and defines them. String data is loaded from `data/known_strings.json`.
 * `GoStringFiller.java`
