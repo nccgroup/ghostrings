@@ -297,11 +297,10 @@ public class GoStringFiller extends GhidraScript {
 
     @Override
     protected void run() throws Exception {
-        final String goStringSym = GhostringsUtil.goStringSymbol(currentProgram);
-        List<Symbol> results = getSymbols(goStringSym, null);
+        final List<Symbol> results = GhostringsUtil.findGoStringSymbol(this);
         if (results.size() != 1) {
             final String msg = String.format(
-                    "Want a single %s symbol, found %d", goStringSym, results.size());
+                    "Want a single go.string.* symbol, found %d", results.size());
             println(msg);
             popup(msg);
             return;
@@ -318,7 +317,8 @@ public class GoStringFiller extends GhidraScript {
                 "all the same length (if unique length values can't be determined),\n" +
                 "which could result in false positives?");
 
-        Symbol goStringsBlob = results.get(0);
+        final Symbol goStringsBlob = results.get(0);
+        final String goStringSym = goStringsBlob.getName();
         printf("%s @ %s\n", goStringSym, goStringsBlob.getAddress());
 
         Address curAddr = goStringsBlob.getAddress();

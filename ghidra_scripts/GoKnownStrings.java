@@ -180,17 +180,17 @@ public class GoKnownStrings extends GhidraScript {
             return;
         }
 
-        final String goStringSym = GhostringsUtil.goStringSymbol(currentProgram);
-        List<Symbol> results = getSymbols(goStringSym, null);
+        final List<Symbol> results = GhostringsUtil.findGoStringSymbol(this);
         if (results.size() != 1) {
             final String msg = String.format(
-                    "Want a single %s symbol, found %d", goStringSym, results.size());
+                    "Want a single go.string.* symbol, found %d", results.size());
             println(msg);
             popup(msg);
             return;
         }
 
-        Symbol goStringsBlob = results.get(0);
+        final Symbol goStringsBlob = results.get(0);
+        final String goStringSym = goStringsBlob.getName();
         Address blobAddr = goStringsBlob.getAddress();
         printf("%s @ %s\n", goStringSym, blobAddr);
 

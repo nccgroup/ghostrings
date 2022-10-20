@@ -17,10 +17,14 @@
  */
 package ghostrings;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import ghidra.app.script.GhidraScript;
+import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressFactory;
 import ghidra.program.model.address.AddressOutOfBoundsException;
@@ -36,6 +40,7 @@ import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
+import ghidra.program.model.symbol.Symbol;
 import ghidra.util.ascii.AsciiCharSetRecognizer;
 import ghostrings.exceptions.DuplicateDataException;
 import ghostrings.exceptions.UnhandledOpArgsException;
@@ -56,14 +61,28 @@ public class GhostringsUtil {
         // No instantiation
     }
 
-    public static String goStringSymbol(Program program) {
+    public static List<String> goStringSymbols(Program program) {
         if ("Mac OS X Mach-O".equals(program.getExecutableFormat())) {
             // Mach-O uses `_go.string.*`
-            return "_go.string.*";
+            return Arrays.asList("_go.string.*", "_go:string.*");
         }
 
         // ELF/PE use `go.string.*`
-        return "go.string.*";
+        return Arrays.asList("go.string.*", "go:string.*");
+    }
+
+    public static List<Symbol> findGoStringSymbol(FlatProgramAPI flatProgramAPI) {
+        List<Symbol> results = new ArrayList<>();
+
+        Program program = flatProgramAPI.getCurrentProgram();
+        List<String> symbolNames = goStringSymbols(program);
+
+        for (String curSymbolName : symbolNames) {
+            List<Symbol> foundSymbols = flatProgramAPI.getSymbols(curSymbolName, null);
+            results.addAll(foundSymbols);
+        }
+
+        return results;
     }
 
     public static String getFuncName(Function func) {
