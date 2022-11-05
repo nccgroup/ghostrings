@@ -23,6 +23,8 @@
 //This version uses a hack combined with the "normalize" simplification
 //style to preserve nicer COPY operations in the PCode output,
 //which clearly indicate a constant value being copied to the stack.
+//
+//NOTE: The hack this script depends on breaks in Ghidra 10.2.
 //@author James Chambers <james.chambers@nccgroup.com>
 //@category Golang
 //@keybinding 
