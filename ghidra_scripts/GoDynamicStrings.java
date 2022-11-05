@@ -389,24 +389,7 @@ public class GoDynamicStrings extends GhidraScript {
                     storeData = null;
                     storeLenOld = null;
 
-                    final String strDesc = String.format("@ %s: \"%s\"",
-                            stringAddr.toString(),
-                            StringUtilities.convertControlCharsToEscapeSequences(checkString));
-                    try {
-                        boolean defineSucceeded = GhostringsUtil.tryDefString(
-                                this, stringAddr, checkString, getVerbose());
-                        if (defineSucceeded) {
-                            println("* Define succeeded " + strDesc);
-                        } else {
-                            println("* Define failed " + strDesc);
-                        }
-                    } catch (DuplicateDataException e) {
-                        // This exact string is already defined
-                        println("* Already defined " + strDesc);
-                    } catch (Exception e) {
-                        // removeData just throws Exception :\
-                        println("* Define failed with exception: " + e.getMessage());
-                    }
+                    tryDefString(stringAddr, checkString);
                 }
             }
 
@@ -414,6 +397,28 @@ public class GoDynamicStrings extends GhidraScript {
 
         if (getVerbose() > 0)
             printf("exit analysis of %s\n", GhostringsUtil.funcNameAndAddr(func));
+    }
+
+    /** Attempt to create the string definition and print a description of what happens. */
+    protected void tryDefString(Address stringAddr, String checkString) {
+        final String strDesc = String.format("@ %s: \"%s\"",
+                stringAddr.toString(),
+                StringUtilities.convertControlCharsToEscapeSequences(checkString));
+        try {
+            boolean defineSucceeded = GhostringsUtil.tryDefString(
+                    this, stringAddr, checkString, getVerbose());
+            if (defineSucceeded) {
+                println("* Define succeeded " + strDesc);
+            } else {
+                println("* Define failed " + strDesc);
+            }
+        } catch (DuplicateDataException e) {
+            // This exact string is already defined
+            println("* Already defined " + strDesc);
+        } catch (Exception e) {
+            // removeData just throws Exception :\
+            println("* Define failed with exception: " + e.getMessage());
+        }
     }
 
     protected String askTargetChoice() throws CancelledException {
