@@ -108,9 +108,8 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
             return null;
         }
 
-        // Check if the address is in .rodata
-        String blockName = GhostringsUtil.memBlockName(program, candidateAddr);
-        if (!STR_MEM_BLOCKS.contains(blockName))
+        // Check if the address is in a memory block where string data is stored.
+        if (!GhostringsUtil.isAddrInStringMemBlock(program, candidateAddr))
             return null;
 
         // If output is a stack address, get the offset

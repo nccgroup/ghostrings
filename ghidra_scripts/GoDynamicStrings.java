@@ -74,13 +74,6 @@ public class GoDynamicStrings extends GhidraScript {
 
     protected final static long MIN_STR_LEN = 1;
     protected final static long MAX_STR_LEN = 0x4000;
-    protected final static Set<String> STR_MEM_BLOCKS;
-    static {
-        STR_MEM_BLOCKS = new HashSet<>();
-        STR_MEM_BLOCKS.add(".rodata"); // ELF
-        STR_MEM_BLOCKS.add(".rdata"); // PE
-        STR_MEM_BLOCKS.add("__rodata"); // Mach-O
-    }
 
     protected int verbose;
     protected final String printfPrefix = getScriptName().replace("%", "%%") + "> ";
@@ -223,9 +216,8 @@ public class GoDynamicStrings extends GhidraScript {
             return null;
         }
 
-        // Check if the address is in .rodata
-        String blockName = GhostringsUtil.memBlockName(program, candidateAddr);
-        if (!STR_MEM_BLOCKS.contains(blockName))
+        // Check if the address is in a memory block where string data is stored.
+        if (!GhostringsUtil.isAddrInStringMemBlock(program, candidateAddr))
             return null;
 
         // If output is a stack address, get the offset

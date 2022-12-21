@@ -57,6 +57,14 @@ public class GhostringsUtil {
         SP_REG_NAMES.add("RSP");
     }
 
+    private final static Set<String> STR_MEM_BLOCKS;
+    static {
+        STR_MEM_BLOCKS = new HashSet<>();
+        STR_MEM_BLOCKS.add(".rodata"); // ELF
+        STR_MEM_BLOCKS.add(".rdata"); // PE
+        STR_MEM_BLOCKS.add("__rodata"); // Mach-O
+    }
+
     private GhostringsUtil() {
         // No instantiation
     }
@@ -104,6 +112,17 @@ public class GhostringsUtil {
             return null;
         }
         return block.getName();
+    }
+
+    /**
+     * Check if address is in a memory block where string data is stored (e.g., rodata).
+     * @param program Program reference
+     * @param addr Address to check
+     * @return True if address is in rodata, false if not.
+     */
+    public static boolean isAddrInStringMemBlock(Program program, Address addr) {
+        String blockName = GhostringsUtil.memBlockName(program, addr);
+        return STR_MEM_BLOCKS.contains(blockName);
     }
 
     /**
