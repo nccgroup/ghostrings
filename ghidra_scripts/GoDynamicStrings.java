@@ -31,10 +31,9 @@
 //@toolbar 
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 
 import ghidra.app.decompiler.DecompInterface;
@@ -49,6 +48,7 @@ import ghidra.framework.options.ToolOptions;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.framework.plugintool.util.OptionsService;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressOutOfBoundsException;
 import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
@@ -180,7 +180,7 @@ public class GoDynamicStrings extends GhidraScript {
                 pcodeOpAST.toString());
     }
 
-    protected AddressCandidate storeDataCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<AddressCandidate> storeDataCheck(Program program, PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.STORE)
             return null;
 
@@ -190,36 +190,6 @@ public class GoDynamicStrings extends GhidraScript {
                     pcodeOpAST.getSeqnum().getOrder());
         }
 
-        // Get input, make sure it's a valid address
-        Varnode dataToStore = pcodeOpAST.getInput(2);
-
-        Address candidateAddr = null;
-
-        if (dataToStore.isConstant()) {
-            // Constant may be an address
-            candidateAddr = GhostringsUtil.addrFromConstant(program, dataToStore);
-        } else if (dataToStore.isRegister()) {
-            // Register may hold an address
-            PcodeOp def = dataToStore.getDef();
-            // Check for LOAD op that loaded an address into the register,
-            // e.g. getting address from constant pool in ARM 32
-            if (def != null && def.getOpcode() == PcodeOp.LOAD) {
-                Address loadFrom = GhostringsUtil.getLoadStoreAddr(def, program.getAddressFactory());
-                Data dataLoaded = getDataAt(loadFrom);
-                if (dataLoaded != null && dataLoaded.isPointer()) {
-                    candidateAddr = (Address) dataLoaded.getValue();
-                }
-            }
-        }
-
-        if (candidateAddr == null) {
-            return null;
-        }
-
-        // Check if the address is in a memory block where string data is stored.
-        if (!GhostringsUtil.isAddrInStringMemBlock(program, candidateAddr))
-            return null;
-
         // If output is a stack address, get the offset
         Varnode storeLoc = pcodeOpAST.getInput(1);
 
@@ -231,21 +201,46 @@ public class GoDynamicStrings extends GhidraScript {
         }
 
         if (stackOffset == null) {
-            if (getVerbose() > 1)
-                println("Couldn't get an SP offset for the output varnode");
             return null;
         }
 
-        if (getVerbose() > 0) {
-            Address destAddr = GhostringsUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
-            printf("copy %s to addr. %s\n", candidateAddr.toString(), destAddr.toString(true));
+        // Get all constant inputs to check for valid addresses
+        Varnode dataToStore = pcodeOpAST.getInput(2);
+        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+
+        // Filter addresses
+        List<AddressCandidate> results = new LinkedList<>();
+
+        for (Long constant : constants) {
+            Address addr;
+            try {
+                addr = GhostringsUtil.addrFromLong(program, constant);
+            } catch (AddressOutOfBoundsException e) {
+                // Nothing to do if it's not a valid address
+                continue;
+            }
+
+            // Check if the address is in a memory block where string data is stored.
+            if (!GhostringsUtil.isAddrInStringMemBlock(program, addr))
+                continue;
+
+            if (getVerbose() > 0) {
+                Address destAddr = GhostringsUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+                printf("copy %s to addr. %s\n", addr.toString(), destAddr.toString(true));
+            }
+
+            AddressCandidate result = new AddressCandidate(addr, stackOffset, pcodeOpAST);
+            results.add(result);
         }
 
-        AddressCandidate result = new AddressCandidate(candidateAddr, stackOffset, pcodeOpAST);
-        return result;
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results;
     }
 
-    protected LengthCandidate storeLenCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<LengthCandidate> storeLenCheck(Program program, PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.STORE)
             return null;
 
@@ -255,18 +250,6 @@ public class GoDynamicStrings extends GhidraScript {
                     pcodeOpAST.getSeqnum().getOrder());
         }
 
-        // Get input, make sure it's a constant
-        Varnode dataToStore = pcodeOpAST.getInput(2);
-        if (!dataToStore.isConstant())
-            return null;
-
-        long constantValue = dataToStore.getAddress().getOffset();
-
-        // Simple string length bounds check
-        if (constantValue < MIN_STR_LEN || constantValue > MAX_STR_LEN) {
-            return null;
-        }
-
         // If output is a stack address, get the offset
         Varnode storeLoc = pcodeOpAST.getInput(1);
 
@@ -283,21 +266,46 @@ public class GoDynamicStrings extends GhidraScript {
             return null;
         }
 
-        if (getVerbose() > 0) {
-            Address destAddr = GhostringsUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+        // Get input, make sure it's a constant
+        Varnode dataToStore = pcodeOpAST.getInput(2);
 
-            printf("copy constant 0x%x to addr. %s\n",
-                    constantValue,
-                    destAddr.toString(true));
+        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+        if (constants.isEmpty()) {
+            return null;
         }
 
-        LengthCandidate result = new LengthCandidate((int) constantValue, stackOffset, pcodeOpAST);
-        return result;
+        // Filter constants
+        List<LengthCandidate> results = new LinkedList<>();
+
+        for (Long constant : constants) {
+            // Simple string length bounds check
+            if (constant < MIN_STR_LEN || constant > MAX_STR_LEN) {
+                continue;
+            }
+
+            if (getVerbose() > 0) {
+                Address destAddr = GhostringsUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+
+                printf("copy constant 0x%x to addr. %s\n",
+                        constant,
+                        destAddr.toString(true));
+            }
+
+            LengthCandidate result = new LengthCandidate(constant.intValue(), stackOffset, pcodeOpAST);
+            results.add(result);
+        }
+
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results;
     }
 
     protected String checkForString(AddressCandidate addrCandidate, LengthCandidate lenCandidate) {
         final int ptrSize = currentProgram.getDefaultPointerSize();
 
+        // Length value should be right after the address on the stack
         if (lenCandidate.getStackOffset() - addrCandidate.getStackOffset() != ptrSize) {
             return null;
         }
@@ -314,15 +322,17 @@ public class GoDynamicStrings extends GhidraScript {
         if (getVerbose() > 0)
             printf("local dynamic string header analysis of %s\n", GhostringsUtil.funcNameAndAddr(func));
 
-        AddressCandidate storeData = null;
-        LengthCandidate storeLen = null;
-        LengthCandidate storeLenOld = null;
+        List<AddressCandidate> storeData = null;
+        List<LengthCandidate> storeLen = null;
+        List<LengthCandidate> storeLenOld = null;
 
         /*
          * TODO: For main analysis loop, need to consider that a single Pcode op can
          * generate multiple address/length candidates in order to handle MULTIEQUAL.
+         * 
          * There can also be pointers to string structs in .rodata, which could be
-         * handled as a single op producing an address and length candidate.
+         * handled as a single op producing an address and length candidate. (Or handled
+         * with a separate script for static string structs.)
          */
 
         Iterator<PcodeOpAST> ops = highFunc.getPcodeOps();
@@ -335,7 +345,8 @@ public class GoDynamicStrings extends GhidraScript {
             boolean opIdentified = false;
 
             // Check for string address or length store
-            AddressCandidate addrCheck = storeDataCheck(currentProgram, pcodeOpAST);
+            // Currently returns null or list with values, no empty list
+            List<AddressCandidate> addrCheck = storeDataCheck(currentProgram, pcodeOpAST);
             if (addrCheck != null) {
                 opIdentified = true;
                 storeData = addrCheck;
@@ -346,7 +357,7 @@ public class GoDynamicStrings extends GhidraScript {
                     storeLen = null;
                 }
             } else {
-                LengthCandidate lenCheck = storeLenCheck(currentProgram, pcodeOpAST);
+                List<LengthCandidate> lenCheck = storeLenCheck(currentProgram, pcodeOpAST);
                 if (lenCheck != null) {
                     opIdentified = true;
                     if (storeLen != null) {
@@ -365,33 +376,115 @@ public class GoDynamicStrings extends GhidraScript {
 
             // When an address and length are set, check for string
             if (storeData != null && storeLen != null) {
-                // Try with length op after address op
-                String checkString = checkForString(storeData, storeLen);
-                if (checkString != null) {
+                boolean hasFinds = tryCandidates(storeData, storeLen);
+                if (hasFinds) {
                     // clear current possible length if it's used
                     storeLen = null;
                 } else if (storeLenOld != null) {
                     // Try with length op before address op
-                    checkString = checkForString(storeData, storeLenOld);
+                    hasFinds = tryCandidates(storeData, storeLenOld);
                 }
 
-                if (checkString != null) {
-                    Address stringAddr = storeData.getStringAddr();
-                    // When a string is found, always clear possible address and old possible length
+                if (hasFinds) {
                     storeData = null;
                     storeLenOld = null;
-
-                    tryDefString(stringAddr, checkString);
                 }
             }
-
         }
 
         if (getVerbose() > 0)
             printf("exit analysis of %s\n", GhostringsUtil.funcNameAndAddr(func));
     }
 
-    /** Attempt to create the string definition and print a description of what happens. */
+    /**
+     * Use list of one or more address candidates with list of one or more length candidates
+     * to attempt to find string data.
+     * @param addresses Non-empty address candidate list
+     * @param lengths Non-empty length candidate list
+     * @return Whether any strings were found
+     */
+    protected boolean tryCandidates(List<AddressCandidate> storeData, List<LengthCandidate> storeLen) {
+        boolean hasFinds = false;
+
+        if (storeLen.size() == 1 && !storeData.isEmpty()) {
+            // One length value, one or many addresses.
+            // - Could be multiple strings with the same length.
+            LengthCandidate lengthCandidate = storeLen.get(0);
+
+            for (AddressCandidate curAddr : storeData) {
+                String checkString = checkForString(curAddr, lengthCandidate);
+                if (checkString != null) {
+                    Address stringAddr = curAddr.getStringAddr();
+                    // When a string is found, always clear possible address and old possible length
+                    hasFinds = true;
+                    tryDefString(stringAddr, checkString);
+                }
+            }
+        } else if (storeLen.size() > 1 && storeData.size() == 1) {
+            // Many length values, one address value.
+            // - Not sure if there's a valid case for this,
+            //   so check for maximum working length value.
+            AddressCandidate addressCandidate = storeData.get(0);
+
+            // Sort lengths in descending order
+            storeLen.sort((l1, l2) -> {
+                return Long.compare(l2.getStringLength(),
+                        l1.getStringLength());
+            });
+
+            for (LengthCandidate curLen : storeLen) {
+                String checkString = checkForString(addressCandidate, curLen);
+                if (checkString != null) {
+                    Address stringAddr = addressCandidate.getStringAddr();
+                    // When a string is found, always clear possible address and old possible length
+                    hasFinds = true;
+                    tryDefString(stringAddr, checkString);
+                    break;
+                }
+            }
+        } else if (storeLen.size() > 1 && storeData.size() > 1) {
+            // Many length values, many address values.
+            // - Could be multiple strings with different lengths.
+            // Can take advantage of the string ordering to help somewhat.
+
+            if (storeLen.size() == storeData.size()) {
+                // Put both lists in descending order
+                storeLen.sort((l1, l2) -> {
+                    return Long.compare(l2.getStringLength(),
+                            l1.getStringLength());
+                });
+
+                storeData.sort((l1, l2) -> {
+                    return l2.getStringAddr().compareTo(l1.getStringAddr());
+                });
+
+                for (int i = 0; i < storeLen.size(); i++) {
+                    AddressCandidate addr = storeData.get(i);
+                    LengthCandidate len = storeLen.get(i);
+
+                    String checkString = checkForString(addr, len);
+                    if (checkString != null) {
+                        Address stringAddr = addr.getStringAddr();
+                        // When a string is found, always clear possible address and old possible length
+                        hasFinds = true;
+                        tryDefString(stringAddr, checkString);
+                    }
+                }
+            } else {
+                // TODO what if the number of lengths and addrs don't match? do non-unique
+                // lengths get consolidated?
+                printf("mismatched number of lens (%d) and addrs (%d)\n",
+                        storeLen.size(), storeData.size());
+            }
+        }
+
+        return hasFinds;
+    }
+
+    /**
+     * Attempt to create the string definition and print a description of what
+     * happens.
+     */
     protected void tryDefString(Address stringAddr, String checkString) {
         final String strDesc = String.format("@ %s: \"%s\"",
                 stringAddr.toString(),

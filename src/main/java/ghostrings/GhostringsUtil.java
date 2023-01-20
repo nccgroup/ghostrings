@@ -20,6 +20,7 @@ package ghostrings;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -64,6 +65,8 @@ public class GhostringsUtil {
         STR_MEM_BLOCKS.add(".rdata"); // PE
         STR_MEM_BLOCKS.add("__rodata"); // Mach-O
     }
+
+    private final static long MAX_RECURSION_DEPTH = 10;
 
     private GhostringsUtil() {
         // No instantiation
@@ -126,10 +129,24 @@ public class GhostringsUtil {
     }
 
     /**
-     * Create a memory address from a constant value varnode
+     * Convenience function to create address object from address integer value.
+     * Uses the integer as an offset in the program's default address space.
+     * @param program Program to create an address for
+     * @param offset Address as integer
+     * @return
+     * @throws AddressOutOfBoundsException
+     */
+    public static Address addrFromLong(Program program, long offset) throws AddressOutOfBoundsException {
+        // Use the value as an address in the program's default address space
+        AddressSpace defaultAddrSpace = program.getAddressFactory().getDefaultAddressSpace();
+        return defaultAddrSpace.getAddress(offset);
+    }
+
+    /**
+     * Create a memory address from a constant value varnode.
      * 
      * @param program Program to create an address for
-     * @param varnode Constant value varnode
+     * @param varnode Constant value varnode containing an address offset
      * @return Address in the program's default address space, with the constant
      *         value as its offset
      * @throws AddressOutOfBoundsException
@@ -142,9 +159,7 @@ public class GhostringsUtil {
         // The constant value is stored as its "address" offset
         long constVal = varnode.getAddress().getOffset();
 
-        // Use the value as an address in the program's default address space
-        AddressSpace defaultAddrSpace = program.getAddressFactory().getDefaultAddressSpace();
-        return defaultAddrSpace.getAddress(constVal);
+        return addrFromLong(program, constVal);
     }
 
     /** Check if register is a stack register */
@@ -246,6 +261,77 @@ public class GhostringsUtil {
 
         Address loadAddr = addrFactory.getAddress(spaceId, offset);
         return loadAddr;
+    }
+
+    /**
+     * Attempt to resolve a varnode to constant values. Intended for use with the
+     * "register" simplification style, which lacks some analysis steps.
+     * 
+     * If it's a constant, just returns the constant. If it's a register, check for
+     * constants assigned to the register (can be multiple for multiequal).
+     * 
+     * @param program
+     * @param varnode
+     * @return List of input constants (may be empty)
+     */
+    public static List<Long> getConstantInputs(FlatProgramAPI programAPI, Varnode varnode) {
+        return getConstantInputs(programAPI, varnode, 0);
+    }
+
+    private static List<Long> getConstantInputs(FlatProgramAPI programAPI, Varnode varnode, long depth) {
+        List<Long> results = new LinkedList<>();
+
+        if (varnode.isConstant()) {
+            results.add(varnode.getOffset());
+        } else if (varnode.isRegister() && varnode.getDef() != null) {
+            // Register may hold a constant
+            PcodeOp def = varnode.getDef();
+
+            switch (def.getOpcode()) {
+            case PcodeOp.LOAD:
+                // Check for LOAD op that loaded a constant into the register,
+                // e.g. getting address from constant pool in ARM 32
+                Program program = programAPI.getCurrentProgram();
+                Address loadFrom = getLoadStoreAddr(def, program.getAddressFactory());
+                Data dataLoaded = programAPI.getDataAt(loadFrom);
+                if (dataLoaded != null) {
+                    if (dataLoaded.isConstant()) {
+                        Long constantValue = (Long) dataLoaded.getValue();
+                        if (constantValue != null) {
+                            results.add(constantValue);
+                        }
+                    } else if (dataLoaded.isPointer()) {
+                        // If the data is a pointer, return its address as a constant
+                        Address addrVal = (Address) dataLoaded.getValue();
+                        if (addrVal != null) {
+                            results.add(addrVal.getOffset());
+                        }
+                    }
+                }
+                break;
+
+            case PcodeOp.COPY:
+                // Noted for multiequal possible register values
+                Varnode copyInput = def.getInput(0);
+                if (copyInput.isConstant()) {
+                    results.add(copyInput.getOffset());
+                }
+                // TODO if a register, recursively resolve?
+                break;
+
+            case PcodeOp.MULTIEQUAL:
+                // Recursively resolve multiequals input constants
+                // TODO check for cycles instead of simple max depth check?
+                if (depth < MAX_RECURSION_DEPTH) {
+                    for (Varnode multiInput : def.getInputs()) {
+                        results.addAll(getConstantInputs(programAPI, multiInput, depth + 1));
+                    }
+                }
+                break;
+            }
+        }
+
+        return results;
     }
 
     /**

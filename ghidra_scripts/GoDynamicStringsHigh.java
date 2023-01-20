@@ -31,6 +31,10 @@
 //@menupath 
 //@toolbar 
 
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+
 import ghidra.app.decompiler.DecompileOptions;
 import ghidra.app.script.GhidraState;
 import ghidra.framework.options.ToolOptions;
@@ -86,7 +90,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
     }
 
     @Override
-    protected AddressCandidate storeDataCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<AddressCandidate> storeDataCheck(Program program, PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.COPY)
             return null;
 
@@ -96,40 +100,51 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
                     pcodeOpAST.getSeqnum().getOrder());
         }
 
-        // Get input, make sure it's a valid address
-        Varnode dataToStore = pcodeOpAST.getInput(0);
-        if (!dataToStore.isConstant())
-            return null;
-
-        Address candidateAddr;
-        try {
-            candidateAddr = GhostringsUtil.addrFromConstant(program, dataToStore);
-        } catch (AddressOutOfBoundsException e) {
-            return null;
-        }
-
-        // Check if the address is in a memory block where string data is stored.
-        if (!GhostringsUtil.isAddrInStringMemBlock(program, candidateAddr))
-            return null;
-
         // If output is a stack address, get the offset
         Varnode storeLoc = pcodeOpAST.getOutput();
         if (!storeLoc.getAddress().isStackAddress()) {
             return null;
         }
 
-        Long stackOffset = storeLoc.getAddress().getOffset();
+        long stackOffset = storeLoc.getAddress().getOffset();
 
-        if (getVerbose() > 0) {
-            printf("copy %s to addr. %s\n", candidateAddr.toString(), storeLoc.getAddress());
+        // Get all constant inputs to check for valid addresses
+        Varnode dataToStore = pcodeOpAST.getInput(0);
+        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+
+        // Filter addresses
+        List<AddressCandidate> results = new LinkedList<>();
+
+        for (Long constant : constants) {
+            Address addr;
+            try {
+                addr = GhostringsUtil.addrFromLong(program, constant);
+            } catch (AddressOutOfBoundsException e) {
+                // Nothing to do if it's not a valid address
+                continue;
+            }
+
+            // Check if the address is in a memory block where string data is stored.
+            if (!GhostringsUtil.isAddrInStringMemBlock(program, addr))
+                continue;
+
+            if (getVerbose() > 0) {
+                printf("copy %s to addr. %s\n", addr.toString(), storeLoc.getAddress());
+            }
+
+            AddressCandidate result = new AddressCandidate(addr, stackOffset, pcodeOpAST);
+            results.add(result);
         }
 
-        AddressCandidate result = new AddressCandidate(candidateAddr, stackOffset, pcodeOpAST);
-        return result;
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results;
     }
 
     @Override
-    protected LengthCandidate storeLenCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<LengthCandidate> storeLenCheck(Program program, PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.COPY)
             return null;
 
@@ -139,34 +154,42 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
                     pcodeOpAST.getSeqnum().getOrder());
         }
 
-        // Get input, make sure it's a constant
-        Varnode dataToStore = pcodeOpAST.getInput(0);
-        if (!dataToStore.isConstant())
-            return null;
-
-        long constantValue = dataToStore.getAddress().getOffset();
-
-        // Simple string length bounds check
-        if (constantValue < MIN_STR_LEN || constantValue > MAX_STR_LEN) {
-            return null;
-        }
-
         // If output is a stack address, get the offset
         Varnode storeLoc = pcodeOpAST.getOutput();
         if (!storeLoc.getAddress().isStackAddress()) {
             return null;
         }
 
-        Long stackOffset = storeLoc.getAddress().getOffset();
+        long stackOffset = storeLoc.getAddress().getOffset();
 
-        if (getVerbose() > 0) {
-            printf("copy constant 0x%x to addr. %s\n",
-                    constantValue,
-                    storeLoc.getAddress());
+        // Get input, make sure it's a constant
+        Varnode dataToStore = pcodeOpAST.getInput(0);
+        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+
+        // Filter constants
+        List<LengthCandidate> results = new LinkedList<>();
+
+        for (Long constantValue : constants) {
+            // Simple string length bounds check
+            if (constantValue < MIN_STR_LEN || constantValue > MAX_STR_LEN) {
+                continue;
+            }
+
+            if (getVerbose() > 0) {
+                printf("copy constant 0x%x to addr. %s\n",
+                        constantValue,
+                        storeLoc.getAddress());
+            }
+
+            LengthCandidate result = new LengthCandidate(constantValue.intValue(), stackOffset, pcodeOpAST);
+            results.add(result);
         }
 
-        LengthCandidate result = new LengthCandidate((int) constantValue, stackOffset, pcodeOpAST);
-        return result;
+        if (results.isEmpty()) {
+            return null;
+        }
+
+        return results;
     }
 
 }
