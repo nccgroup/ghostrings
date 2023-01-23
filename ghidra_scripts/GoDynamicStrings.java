@@ -261,18 +261,12 @@ public class GoDynamicStrings extends GhidraScript {
         }
 
         if (stackOffset == null) {
-            if (getVerbose() > 1)
-                println("Couldn't get an SP offset for the output varnode");
             return null;
         }
 
         // Get input, make sure it's a constant
         Varnode dataToStore = pcodeOpAST.getInput(2);
-
         List<Long> constants = PcodeUtil.getConstantInputs(this, dataToStore);
-        if (constants.isEmpty()) {
-            return null;
-        }
 
         // Filter constants
         List<LengthCandidate> results = new LinkedList<>();
@@ -322,18 +316,14 @@ public class GoDynamicStrings extends GhidraScript {
         if (getVerbose() > 0)
             printf("local dynamic string header analysis of %s\n", GhostringsUtil.funcNameAndAddr(func));
 
+        /*
+         * TODO: Sometimes length/addr are directly passed through registers, never
+         * written to the stack.
+         */
+
         List<AddressCandidate> storeData = null;
         List<LengthCandidate> storeLen = null;
         List<LengthCandidate> storeLenOld = null;
-
-        /*
-         * TODO: For main analysis loop, need to consider that a single Pcode op can
-         * generate multiple address/length candidates in order to handle MULTIEQUAL.
-         * 
-         * There can also be pointers to string structs in .rodata, which could be
-         * handled as a single op producing an address and length candidate. (Or handled
-         * with a separate script for static string structs.)
-         */
 
         Iterator<PcodeOpAST> ops = highFunc.getPcodeOps();
         while (ops.hasNext() && !monitor.isCancelled()) {
@@ -366,8 +356,6 @@ public class GoDynamicStrings extends GhidraScript {
                     storeLen = lenCheck;
                 }
             }
-
-            // funcCallCheck was here to test working with calls that ate up stack variables
 
             if (!opIdentified) {
                 // Nothing new to check found
