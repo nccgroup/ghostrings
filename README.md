@@ -62,6 +62,8 @@ These can be found in the Golang category in the Script Manager.
   * Performs the same analysis as `GoDynamicStrings.java`, but uses a single decompiler process. Use this if analyzing a large binary causes the parallel decompiler processes to exhaust system memory.
 * `GoDynamicStringsHigh.java`
   * Experimental, uses P-Code output from the higher level "normalize" style analysis. Currently depends on a hack that turns off deadcode elimination in the decompiler (see <https://research.nccgroup.com/2022/05/20/earlyremoval-in-the-conservatory-with-the-wrench/>). *This hack breaks in Ghidra 10.2.*
+* `GoStaticStrings.java`
+  * Find Go string structures statically allocated in read-only memory.
 * `GoKnownStrings.java`
   * Searches for standard unique strings and defines them. String data is loaded from `data/known_strings.json`.
 * `GoStringFiller.java`
@@ -83,15 +85,16 @@ Here’s the general flow for using these scripts to recover string definitions 
    1. In the "Defined Strings" window, add the "Mem Block" column to the display
    2. Create a filter on the memory block column to only show strings in the target block
    3. Select all strings in the window, then in the listing right-click and choose "Clear Code Bytes"
-2. Run `GoDynamicStrings.java` or `GoDynamicStringsHigh.java`.
-3. *(Optional)* Run `GoKnownStrings.java` to detect some standard strings.
-4. Run `GoStringFiller.java`.
+2. *(Optional)* Run `GoKnownStrings.java` to detect some standard strings.
+3. Run `GoStaticStrings.java`.
+4. Run `GoDynamicStrings.java`.
+5. Run `GoStringFiller.java`.
    * If it detects false positive short strings (strings that violate the ascending length order), clear them and re-run the script. There is an option to do this automatically.
    * If the binary is stripped, locate the area of one byte strings found by the dynamic strings script.
      Ensure it's the start of the grouped together non-null-terminated strings (more strings should be defined after with length in ascending order).
      Create the label `go.string.*` at the first one byte string.
-5. Check for remaining gaps in `go.string.*`, and define any strings with obvious start and end points. Sometimes defining one or two strings and re-running `GoStringFiller.java` is sufficient to fill in remaining gaps.
-6. *(Optional)* Re-run Ghidra's built-in ASCII String analysis tool.
+6. Check for remaining gaps in `go.string.*`, and define any strings with obvious start and end points. Sometimes defining one or two strings and re-running `GoStringFiller.java` is sufficient to fill in remaining gaps.
+7. *(Optional)* Re-run Ghidra's built-in ASCII String analysis tool.
    * Disable overwriting existing strings. Run with and then without the null terminator requirement.
 
 
