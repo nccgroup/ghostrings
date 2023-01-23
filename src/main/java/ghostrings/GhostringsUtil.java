@@ -82,11 +82,18 @@ public class GhostringsUtil {
         return Arrays.asList("go.string.*", "go:string.*");
     }
 
-    public static List<Symbol> findGoStringSymbol(FlatProgramAPI flatProgramAPI) {
-        List<Symbol> results = new ArrayList<>();
+    public static List<String> goFuncSymbols(Program program) {
+        if ("Mac OS X Mach-O".equals(program.getExecutableFormat())) {
+            // Mach-O uses `_go.func.*`
+            return Arrays.asList("_go.func.*", "_go:func.*");
+        }
 
-        Program program = flatProgramAPI.getCurrentProgram();
-        List<String> symbolNames = goStringSymbols(program);
+        // ELF/PE use `go.func.*`
+        return Arrays.asList("go.func.*", "go:func.*");
+    }
+
+    private static List<Symbol> findAllSymbols(FlatProgramAPI flatProgramAPI, List<String> symbolNames) {
+        List<Symbol> results = new LinkedList<>();
 
         for (String curSymbolName : symbolNames) {
             List<Symbol> foundSymbols = flatProgramAPI.getSymbols(curSymbolName, null);
@@ -94,6 +101,18 @@ public class GhostringsUtil {
         }
 
         return results;
+    }
+
+    public static List<Symbol> findGoStringSymbol(FlatProgramAPI flatProgramAPI) {
+        Program program = flatProgramAPI.getCurrentProgram();
+        List<String> symbolNames = goStringSymbols(program);
+        return findAllSymbols(flatProgramAPI, symbolNames);
+    }
+
+    public static List<Symbol> findGoFuncSymbol(FlatProgramAPI flatProgramAPI) {
+        Program program = flatProgramAPI.getCurrentProgram();
+        List<String> symbolNames = goFuncSymbols(program);
+        return findAllSymbols(flatProgramAPI, symbolNames);
     }
 
     public static String getFuncName(Function func) {
