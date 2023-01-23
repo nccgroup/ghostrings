@@ -35,6 +35,7 @@ import ghidra.util.DataConverter;
 import ghidra.util.LittleEndianDataConverter;
 import ghidra.util.StringUtilities;
 import ghostrings.GhostringsUtil;
+import ghostrings.PcodeUtil;
 
 public class GoStaticStrings extends GhidraScript {
 
@@ -106,7 +107,7 @@ public class GoStaticStrings extends GhidraScript {
 
                 Address addr;
                 try {
-                    addr = GhostringsUtil.addrFromLong(currentProgram, addrInt);
+                    addr = PcodeUtil.addrFromLong(currentProgram, addrInt);
                 } catch (AddressOutOfBoundsException e) {
                     continue;
                 }

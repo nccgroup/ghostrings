@@ -62,6 +62,7 @@ import ghidra.util.task.TaskMonitor;
 import ghostrings.AddressCandidate;
 import ghostrings.GhostringsUtil;
 import ghostrings.LengthCandidate;
+import ghostrings.PcodeUtil;
 import ghostrings.exceptions.DuplicateDataException;
 import ghostrings.exceptions.UnhandledOpArgsException;
 import ghostrings.exceptions.UnhandledOpTypeException;
@@ -194,7 +195,7 @@ public class GoDynamicStrings extends GhidraScript {
 
         Long stackOffset = null;
         try {
-            stackOffset = GhostringsUtil.outputStackOffset(program, storeLoc);
+            stackOffset = PcodeUtil.outputStackOffset(program, storeLoc);
         } catch (UnhandledOpTypeException | UnhandledOpArgsException e) {
             println(e.getMessage());
         }
@@ -205,7 +206,7 @@ public class GoDynamicStrings extends GhidraScript {
 
         // Get all constant inputs to check for valid addresses
         Varnode dataToStore = pcodeOpAST.getInput(2);
-        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+        List<Long> constants = PcodeUtil.getConstantInputs(this, dataToStore);
 
         // Filter addresses
         List<AddressCandidate> results = new LinkedList<>();
@@ -213,7 +214,7 @@ public class GoDynamicStrings extends GhidraScript {
         for (Long constant : constants) {
             Address addr;
             try {
-                addr = GhostringsUtil.addrFromLong(program, constant);
+                addr = PcodeUtil.addrFromLong(program, constant);
             } catch (AddressOutOfBoundsException e) {
                 // Nothing to do if it's not a valid address
                 continue;
@@ -224,7 +225,7 @@ public class GoDynamicStrings extends GhidraScript {
                 continue;
 
             if (getVerbose() > 0) {
-                Address destAddr = GhostringsUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
                 printf("copy %s to addr. %s\n", addr.toString(), destAddr.toString(true));
             }
 
@@ -254,7 +255,7 @@ public class GoDynamicStrings extends GhidraScript {
 
         Long stackOffset = null;
         try {
-            stackOffset = GhostringsUtil.outputStackOffset(program, storeLoc);
+            stackOffset = PcodeUtil.outputStackOffset(program, storeLoc);
         } catch (UnhandledOpTypeException | UnhandledOpArgsException e) {
             println(e.getMessage());
         }
@@ -268,7 +269,7 @@ public class GoDynamicStrings extends GhidraScript {
         // Get input, make sure it's a constant
         Varnode dataToStore = pcodeOpAST.getInput(2);
 
-        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+        List<Long> constants = PcodeUtil.getConstantInputs(this, dataToStore);
         if (constants.isEmpty()) {
             return null;
         }
@@ -283,7 +284,7 @@ public class GoDynamicStrings extends GhidraScript {
             }
 
             if (getVerbose() > 0) {
-                Address destAddr = GhostringsUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
 
                 printf("copy constant 0x%x to addr. %s\n",
                         constant,

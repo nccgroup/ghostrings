@@ -49,6 +49,7 @@ import ghidra.program.model.pcode.Varnode;
 import ghostrings.AddressCandidate;
 import ghostrings.GhostringsUtil;
 import ghostrings.LengthCandidate;
+import ghostrings.PcodeUtil;
 
 public class GoDynamicStringsHigh extends GoDynamicStrings {
 
@@ -110,7 +111,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
 
         // Get all constant inputs to check for valid addresses
         Varnode dataToStore = pcodeOpAST.getInput(0);
-        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+        List<Long> constants = PcodeUtil.getConstantInputs(this, dataToStore);
 
         // Filter addresses
         List<AddressCandidate> results = new LinkedList<>();
@@ -118,7 +119,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
         for (Long constant : constants) {
             Address addr;
             try {
-                addr = GhostringsUtil.addrFromLong(program, constant);
+                addr = PcodeUtil.addrFromLong(program, constant);
             } catch (AddressOutOfBoundsException e) {
                 // Nothing to do if it's not a valid address
                 continue;
@@ -164,7 +165,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
 
         // Get input, make sure it's a constant
         Varnode dataToStore = pcodeOpAST.getInput(0);
-        List<Long> constants = GhostringsUtil.getConstantInputs(this, dataToStore);
+        List<Long> constants = PcodeUtil.getConstantInputs(this, dataToStore);
 
         // Filter constants
         List<LengthCandidate> results = new LinkedList<>();
