@@ -311,11 +311,13 @@ public class GoStringFiller extends GhidraScript {
                 "Automatically clear a defined string if it violates the\n" +
                 "ascending length order of go.string.*?");
 
+        /*
         allowFalsePositives = askYesNo(
                 "Allow false positives?",
                 "Assume gaps in go.string.* are filled with strings of\n" +
                 "all the same length (if unique length values can't be determined),\n" +
                 "which could result in false positives?");
+        */
 
         final Symbol goStringsBlob = results.get(0);
         final String goStringSym = goStringsBlob.getName();

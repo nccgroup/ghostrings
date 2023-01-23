@@ -87,10 +87,9 @@ Here’s the general flow for using these scripts to recover string definitions 
 3. *(Optional)* Run `GoKnownStrings.java` to detect some standard strings.
 4. Run `GoStringFiller.java`.
    * If it detects false positive short strings (strings that violate the ascending length order), clear them and re-run the script. There is an option to do this automatically.
-   * There’s an option to allow the script to define strings even when a unique set of string lengths can’t be identified, as a last resort. Specifically, there’s one rule that checks if a gap’s size is evenly divisible only by a single string length. It’s possible there are actually strings of different lengths in the gap, but this works often enough to be useful. I recommend running the script without allowing false positives until all the short strings have been fixed.
    * If the binary is stripped, locate the area of one byte strings found by the dynamic strings script.
      Ensure it's the start of the grouped together non-null-terminated strings (more strings should be defined after with length in ascending order).
-     Create the label `go.string.*` at the first one byte string. 
+     Create the label `go.string.*` at the first one byte string.
 5. Check for remaining gaps in `go.string.*`, and define any strings with obvious start and end points. Sometimes defining one or two strings and re-running `GoStringFiller.java` is sufficient to fill in remaining gaps.
 6. *(Optional)* Re-run Ghidra's built-in ASCII String analysis tool.
    * Disable overwriting existing strings. Run with and then without the null terminator requirement.
