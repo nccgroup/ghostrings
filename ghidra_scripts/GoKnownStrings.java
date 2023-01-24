@@ -43,7 +43,7 @@ import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.StringUtilities;
-import ghostrings.GhostringsUtil;
+import ghostrings.GolangProgramInfo;
 
 public class GoKnownStrings extends GhidraScript {
 
@@ -180,7 +180,9 @@ public class GoKnownStrings extends GhidraScript {
             return;
         }
 
-        final List<Symbol> results = GhostringsUtil.findGoStringSymbol(this);
+        GolangProgramInfo golangInfo = new GolangProgramInfo(this, true);
+
+        final List<Symbol> results = golangInfo.getGoStringSymbols();
         if (results.size() != 1) {
             final String msg = String.format(
                     "Want a single go.string.* symbol, found %d", results.size());

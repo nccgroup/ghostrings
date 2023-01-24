@@ -17,17 +17,10 @@
  */
 package ghostrings;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import ghidra.app.script.GhidraScript;
-import ghidra.app.util.opinion.ElfLoader;
-import ghidra.app.util.opinion.MachoLoader;
-import ghidra.app.util.opinion.PeLoader;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOverflowException;
@@ -37,46 +30,17 @@ import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryAccessException;
-import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.util.ascii.AsciiCharSetRecognizer;
 import ghostrings.exceptions.DuplicateDataException;
 
 public class GhostringsUtil {
 
-    private final static HashMap<String, String> STR_MEM_BLOCKS_MAP;
-    static {
-        STR_MEM_BLOCKS_MAP = new HashMap<>();
-        STR_MEM_BLOCKS_MAP.put(ElfLoader.ELF_NAME, ".rodata");
-        STR_MEM_BLOCKS_MAP.put(PeLoader.PE_NAME, ".rdata");
-        STR_MEM_BLOCKS_MAP.put(MachoLoader.MACH_O_NAME, "__rodata");
-    }
-
     private GhostringsUtil() {
         // No instantiation
     }
 
-    public static List<String> goStringSymbols(Program program) {
-        if (MachoLoader.MACH_O_NAME.equals(program.getExecutableFormat())) {
-            // Mach-O uses `_go.string.*`
-            return Arrays.asList("_go.string.*", "_go:string.*");
-        }
-
-        // ELF/PE use `go.string.*`
-        return Arrays.asList("go.string.*", "go:string.*");
-    }
-
-    public static List<String> goFuncSymbols(Program program) {
-        if (MachoLoader.MACH_O_NAME.equals(program.getExecutableFormat())) {
-            // Mach-O uses `_go.func.*`
-            return Arrays.asList("_go.func.*", "_go:func.*");
-        }
-
-        // ELF/PE use `go.func.*`
-        return Arrays.asList("go.func.*", "go:func.*");
-    }
-
-    private static List<Symbol> findAllSymbols(FlatProgramAPI flatProgramAPI, List<String> symbolNames) {
+    static List<Symbol> findAllSymbols(FlatProgramAPI flatProgramAPI, List<String> symbolNames) {
         List<Symbol> results = new LinkedList<>();
 
         for (String curSymbolName : symbolNames) {
@@ -85,18 +49,6 @@ public class GhostringsUtil {
         }
 
         return results;
-    }
-
-    public static List<Symbol> findGoStringSymbol(FlatProgramAPI flatProgramAPI) {
-        Program program = flatProgramAPI.getCurrentProgram();
-        List<String> symbolNames = goStringSymbols(program);
-        return findAllSymbols(flatProgramAPI, symbolNames);
-    }
-
-    public static List<Symbol> findGoFuncSymbol(FlatProgramAPI flatProgramAPI) {
-        Program program = flatProgramAPI.getCurrentProgram();
-        List<String> symbolNames = goFuncSymbols(program);
-        return findAllSymbols(flatProgramAPI, symbolNames);
     }
 
     public static String getFuncName(Function func) {
@@ -110,43 +62,6 @@ public class GhostringsUtil {
                 "%s @ %s",
                 getFuncName(func),
                 func.getEntryPoint().toString());
-    }
-
-    public static String memBlockName(Program program, Address addr) {
-        MemoryBlock block = program.getMemory().getBlock(addr);
-        if (block == null) {
-            return null;
-        }
-        return block.getName();
-    }
-
-    public static String roDataBlockName(Program program) {
-        String progFormat = program.getExecutableFormat();
-        if (progFormat == null) {
-            return null;
-        }
-
-        return STR_MEM_BLOCKS_MAP.get(progFormat);
-    }
-
-    /**
-     * Check if address is in a memory block where string data is stored (e.g., rodata).
-     * @param program Program reference
-     * @param addr Address to check
-     * @return True if address is in rodata, false if not.
-     */
-    public static boolean isAddrInStringMemBlock(Program program, Address addr) {
-        String blockName = GhostringsUtil.memBlockName(program, addr);
-        if (blockName == null) {
-            return false;
-        }
-
-        String progRoBlockName = roDataBlockName(program);
-        if (progRoBlockName == null) {
-            return false;
-        }
-
-        return progRoBlockName.equals(blockName);
     }
 
     /**

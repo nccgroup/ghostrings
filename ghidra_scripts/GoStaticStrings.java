@@ -35,6 +35,7 @@ import ghidra.util.DataConverter;
 import ghidra.util.LittleEndianDataConverter;
 import ghidra.util.StringUtilities;
 import ghostrings.GhostringsUtil;
+import ghostrings.GolangProgramInfo;
 import ghostrings.PcodeUtil;
 import ghostrings.exceptions.DuplicateDataException;
 
@@ -159,15 +160,18 @@ public class GoStaticStrings extends GhidraScript {
             dataConverter = LittleEndianDataConverter.INSTANCE;
         }
 
-        // Use go.string.* - go.func.* as boundaries if possible
-        List<Symbol> startSyms = GhostringsUtil.findGoStringSymbol(this);
-        List<Symbol> endSyms = GhostringsUtil.findGoFuncSymbol(this);
+        GolangProgramInfo golangInfo = new GolangProgramInfo(this, true);
+
+        // Use go.string.* - go.func.* as boundaries for the string data if possible
+        List<Symbol> startSyms = golangInfo.getGoStringSymbols();
+        List<Symbol> endSyms = golangInfo.getGoFuncSymbols();
 
         if (startSyms.size() == 1 && endSyms.size() == 1) {
             Address goStringAddr = startSyms.get(0).getAddress();
             Address goFuncAddr = endSyms.get(0).getAddress();
 
-            // Should normally be in same block
+            // go.string must come before go.func, and they're expected to be in the same
+            // block
             if (addrsInSameBlock(goStringAddr, goFuncAddr) && goStringAddr.compareTo(goFuncAddr) < 0) {
                 stringsStartAddr = goStringAddr;
                 printf("using %s @ %s as the start boundary\n",
@@ -181,17 +185,7 @@ public class GoStaticStrings extends GhidraScript {
             }
         }
 
-        MemoryBlock roBlock = null;
-        if (stringsStartAddr != null) {
-            // assume go.string.* and static allocated structs are in the same block
-            roBlock = currentProgram.getMemory().getBlock(stringsStartAddr);
-        } else {
-            String roBlockName = GhostringsUtil.roDataBlockName(currentProgram);
-            if (roBlockName != null) {
-                roBlock = currentProgram.getMemory().getBlock(roBlockName);
-            }
-        }
-
+        MemoryBlock roBlock = golangInfo.getRoDataBlock();
         if (roBlock == null) {
             printf("Couldn't determine rodata block\n");
             return;

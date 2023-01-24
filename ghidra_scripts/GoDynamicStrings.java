@@ -61,6 +61,7 @@ import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 import ghostrings.AddressCandidate;
 import ghostrings.GhostringsUtil;
+import ghostrings.GolangProgramInfo;
 import ghostrings.LengthCandidate;
 import ghostrings.PcodeUtil;
 import ghostrings.exceptions.DuplicateDataException;
@@ -75,6 +76,7 @@ public class GoDynamicStrings extends GhidraScript {
     protected final static long MIN_STR_LEN = 1;
     protected final static long MAX_STR_LEN = 0x4000;
 
+    protected GolangProgramInfo golangInfo;
     protected int verbose;
     protected final String printfPrefix = getScriptName().replace("%", "%%") + "> ";
 
@@ -221,7 +223,7 @@ public class GoDynamicStrings extends GhidraScript {
             }
 
             // Check if the address is in a memory block where string data is stored.
-            if (!GhostringsUtil.isAddrInStringMemBlock(program, addr))
+            if (!getGolangInfo().isAddrInStringMemBlock(addr))
                 continue;
 
             if (getVerbose() > 0) {
@@ -516,6 +518,7 @@ public class GoDynamicStrings extends GhidraScript {
     }
 
     public void run() throws Exception {
+        setGolangInfo(new GolangProgramInfo(this, true));
         setVerbose(0);
 
         println("Start Go string finder");
@@ -560,6 +563,14 @@ public class GoDynamicStrings extends GhidraScript {
 
     protected void setVerbose(int verbose) {
         this.verbose = verbose;
+    }
+
+    public GolangProgramInfo getGolangInfo() {
+        return golangInfo;
+    }
+
+    public void setGolangInfo(GolangProgramInfo golangInfo) {
+        this.golangInfo = golangInfo;
     }
 
 }
