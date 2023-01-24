@@ -30,6 +30,7 @@ import ghidra.program.model.listing.Data;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryAccessException;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.util.ascii.AsciiCharSetRecognizer;
 import ghostrings.exceptions.DuplicateDataException;
@@ -162,4 +163,10 @@ public class GhostringsUtil {
         return true;
     }
 
+    public static boolean addrsInSameBlock(Program program, Address addr1, Address addr2) {
+        MemoryBlock block1 = program.getMemory().getBlock(addr1);
+        MemoryBlock block2 = program.getMemory().getBlock(addr2);
+
+        return block1.equals(block2);
+    }
 }

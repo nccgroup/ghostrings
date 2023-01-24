@@ -126,7 +126,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
             }
 
             // Check if the address is in a memory block where string data is stored.
-            if (!getGolangInfo().isAddrInStringMemBlock(addr))
+            if (!getGolangInfo().isAddrInStringData(addr))
                 continue;
 
             if (getVerbose() > 0) {

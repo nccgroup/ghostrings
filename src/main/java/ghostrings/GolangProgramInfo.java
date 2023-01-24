@@ -47,11 +47,14 @@ public class GolangProgramInfo {
     }
 
     private FlatProgramAPI flatProgramAPI;
+    private boolean defaultExeFormatFallback;
+
+    // Fields determined by program analysis
     private MemoryBlock roDataBlock;
     private List<Symbol> goStringSymbols;
     private List<Symbol> goFuncSymbols;
-
-    private boolean defaultExeFormatFallback;
+    private Address stringDataStart;
+    private Address stringDataEnd;
 
     /**
      * Analyzes a Go binary to determine symbols, memory block names, and other
@@ -61,8 +64,9 @@ public class GolangProgramInfo {
      * @param flatProgramAPI     Flat program API for the program to analyze
      * @param allowDefaultFormat Whether to fall back to some default set of info if
      *                           the executable format is unrecognized
+     * @throws Exception If critical information can't be determined
      */
-    public GolangProgramInfo(FlatProgramAPI flatProgramAPI, boolean allowDefaultFormat) {
+    public GolangProgramInfo(FlatProgramAPI flatProgramAPI, boolean allowDefaultFormat) throws Exception {
         setFlatProgramAPI(flatProgramAPI);
 
         setDefaultExeFormatFallback(allowDefaultFormat);
@@ -70,6 +74,7 @@ public class GolangProgramInfo {
         // Initial analysis
         determineRoDataBlock();
         determineGoSymbols();
+        determineStringDataBounds();
     }
 
     private FlatProgramAPI getFlatProgramAPI() {
@@ -112,6 +117,22 @@ public class GolangProgramInfo {
         this.defaultExeFormatFallback = defaultExeFormatFallback;
     }
 
+    public Address getStringDataStart() {
+        return stringDataStart;
+    }
+
+    private void setStringDataStart(Address stringDataStart) {
+        this.stringDataStart = stringDataStart;
+    }
+
+    public Address getStringDataEnd() {
+        return stringDataEnd;
+    }
+
+    private void setStringDataEnd(Address stringDataEnd) {
+        this.stringDataEnd = stringDataEnd;
+    }
+
     private Program getProgram() {
         return getFlatProgramAPI().getCurrentProgram();
     }
@@ -132,8 +153,6 @@ public class GolangProgramInfo {
      * Find main read-only data block where string data is stored
      */
     private void determineRoDataBlock() {
-        setRoDataBlock(null);
-
         String exeFormat = getExecutableFormat();
         if (exeFormat == null) {
             return;
@@ -145,10 +164,6 @@ public class GolangProgramInfo {
         }
 
         MemoryBlock roBlock = getProgram().getMemory().getBlock(roDataBlockName);
-        if (roBlock == null) {
-            return;
-        }
-
         setRoDataBlock(roBlock);
     }
 
@@ -172,19 +187,63 @@ public class GolangProgramInfo {
     }
 
     /**
-     * Check if address is in a memory block where string data is stored (e.g.,
-     * rodata).
-     * 
-     * @param addr Address to check
-     * @return True if address is in rodata, false if not.
+     * Use go.string.* - go.func.* as boundaries for the string data if possible.
+     * Otherwise fall back to the read-only block start and/or end addresses.
+     * @throws Exception If there's not enough info to determine start and end boundaries
      */
-    public boolean isAddrInStringMemBlock(Address addr) {
-        MemoryBlock roData = getRoDataBlock();
-        if (roData == null) {
-            // Could maybe throw an exception instead
-            return false;
+    private void determineStringDataBounds() throws Exception {
+        Address start = null;
+        Address end = null;
+
+        List<Symbol> startSyms = getGoStringSymbols();
+        List<Symbol> endSyms = getGoFuncSymbols();
+
+        if (startSyms.size() == 1) {
+            start = startSyms.get(0).getAddress();
         }
 
-        return roData.contains(addr);
+        if (endSyms.size() == 1) {
+            end = endSyms.get(0).getAddress();
+        }
+
+        // Use rodata fallback if necessary
+        if (start == null || end == null) {
+            MemoryBlock roBlock = getRoDataBlock();
+            if (roBlock == null) {
+                throw new Exception("Can't determine boundaries for string data");
+            }
+
+            if (start == null) {
+                start = roBlock.getStart();
+            }
+
+            if (end == null) {
+                end = roBlock.getEnd();
+            }
+        }
+
+        // go.string must come before go.func, and they're expected to be in the same
+        // block
+        if (GhostringsUtil.addrsInSameBlock(getProgram(), start, end) &&
+                start.compareTo(end) < 0) {
+            setStringDataStart(start);
+            setStringDataEnd(end);
+        } else {
+            throw new Exception("String boundary addresses fail sanity check");
+        }
     }
+
+    /**
+     * Use go.string boundary info if available to determine if potential string
+     * address is located in go.string
+     * 
+     * @param addr Potential string address to check
+     * @return True if the address doesn't violate known address boundaries
+     */
+    public boolean isAddrInStringData(Address addr) {
+        Address start = getStringDataStart();
+        Address end = getStringDataEnd();
+        return addr.compareTo(start) >= 0 && addr.compareTo(end) < 0;
+    }
+
 }

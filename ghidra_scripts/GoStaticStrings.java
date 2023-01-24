@@ -44,9 +44,7 @@ public class GoStaticStrings extends GhidraScript {
     private int ptrSize;
     private boolean bigEndian;
     private DataConverter dataConverter;
-
-    private Address stringsStartAddr = null;
-    private Address stringsEndAddr = null;
+    private GolangProgramInfo golangInfo;
 
     static String hexAscii(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
@@ -56,32 +54,6 @@ public class GoStaticStrings extends GhidraScript {
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Use go.string boundary info if available to determine if potential string
-     * address is located in go.string
-     * 
-     * @param addr Potential string address to check
-     * @return True if the address doesn't violate known address boundaries
-     */
-    protected boolean addrInBounds(Address addr) {
-        if (stringsStartAddr != null && addr.compareTo(stringsStartAddr) < 0) {
-            return false;
-        }
-
-        if (stringsEndAddr != null && addr.compareTo(stringsEndAddr) >= 0) {
-            return false;
-        }
-
-        return true;
-    }
-
-    protected boolean addrsInSameBlock(Address addr1, Address addr2) {
-        MemoryBlock block1 = currentProgram.getMemory().getBlock(addr1);
-        MemoryBlock block2 = currentProgram.getMemory().getBlock(addr2);
-
-        return block1.equals(block2);
     }
 
     protected void checkBlock(MemoryBlock roBlock) throws MemoryAccessException {
@@ -115,7 +87,7 @@ public class GoStaticStrings extends GhidraScript {
                 }
 
                 // Use go.string boundary info if available
-                if (!addrInBounds(addr)) {
+                if (!golangInfo.isAddrInStringData(addr)) {
                     continue;
                 }
 
@@ -160,30 +132,7 @@ public class GoStaticStrings extends GhidraScript {
             dataConverter = LittleEndianDataConverter.INSTANCE;
         }
 
-        GolangProgramInfo golangInfo = new GolangProgramInfo(this, true);
-
-        // Use go.string.* - go.func.* as boundaries for the string data if possible
-        List<Symbol> startSyms = golangInfo.getGoStringSymbols();
-        List<Symbol> endSyms = golangInfo.getGoFuncSymbols();
-
-        if (startSyms.size() == 1 && endSyms.size() == 1) {
-            Address goStringAddr = startSyms.get(0).getAddress();
-            Address goFuncAddr = endSyms.get(0).getAddress();
-
-            // go.string must come before go.func, and they're expected to be in the same
-            // block
-            if (addrsInSameBlock(goStringAddr, goFuncAddr) && goStringAddr.compareTo(goFuncAddr) < 0) {
-                stringsStartAddr = goStringAddr;
-                printf("using %s @ %s as the start boundary\n",
-                        startSyms.get(0).getName(),
-                        stringsStartAddr);
-
-                stringsEndAddr = goFuncAddr;
-                printf("using %s @ %s as the end boundary\n",
-                        endSyms.get(0).getName(),
-                        stringsEndAddr);
-            }
-        }
+        golangInfo = new GolangProgramInfo(this, true);
 
         MemoryBlock roBlock = golangInfo.getRoDataBlock();
         if (roBlock == null) {
