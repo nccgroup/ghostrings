@@ -36,6 +36,7 @@ import ghidra.util.LittleEndianDataConverter;
 import ghidra.util.StringUtilities;
 import ghostrings.GhostringsUtil;
 import ghostrings.PcodeUtil;
+import ghostrings.exceptions.DuplicateDataException;
 
 public class GoStaticStrings extends GhidraScript {
 
@@ -130,11 +131,13 @@ public class GoStaticStrings extends GhidraScript {
                     if (checkStr != null) {
                         try {
                             if (GhostringsUtil.tryDefString(this, addr, checkStr, 0)) {
-                                printf("defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
+                                printf("Defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
                             }
+                        } catch (DuplicateDataException e) {
+                            // This exact string is already defined
+                            printf("Already defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
                         } catch (Exception e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
+                            printf("Define failed with exception: %s\n", e.getMessage());
                         }
                     }
                 }
@@ -178,14 +181,20 @@ public class GoStaticStrings extends GhidraScript {
             }
         }
 
-        MemoryBlock roBlock;
+        MemoryBlock roBlock = null;
         if (stringsStartAddr != null) {
             // assume go.string.* and static allocated structs are in the same block
             roBlock = currentProgram.getMemory().getBlock(stringsStartAddr);
         } else {
-            // TODO: Golang util API should provide the name of the rodata block for this
-            // program
-            roBlock = currentProgram.getMemory().getBlock(".rodata");
+            String roBlockName = GhostringsUtil.roDataBlockName(currentProgram);
+            if (roBlockName != null) {
+                roBlock = currentProgram.getMemory().getBlock(roBlockName);
+            }
+        }
+
+        if (roBlock == null) {
+            printf("Couldn't determine rodata block\n");
+            return;
         }
 
         checkBlock(roBlock);

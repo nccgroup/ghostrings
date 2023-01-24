@@ -18,12 +18,16 @@
 package ghostrings;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
 import ghidra.app.script.GhidraScript;
+import ghidra.app.util.opinion.ElfLoader;
+import ghidra.app.util.opinion.MachoLoader;
+import ghidra.app.util.opinion.PeLoader;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOverflowException;
@@ -40,12 +44,12 @@ import ghostrings.exceptions.DuplicateDataException;
 
 public class GhostringsUtil {
 
-    private final static Set<String> STR_MEM_BLOCKS;
+    private final static HashMap<String, String> STR_MEM_BLOCKS_MAP;
     static {
-        STR_MEM_BLOCKS = new HashSet<>();
-        STR_MEM_BLOCKS.add(".rodata"); // ELF
-        STR_MEM_BLOCKS.add(".rdata"); // PE
-        STR_MEM_BLOCKS.add("__rodata"); // Mach-O
+        STR_MEM_BLOCKS_MAP = new HashMap<>();
+        STR_MEM_BLOCKS_MAP.put(ElfLoader.ELF_NAME, ".rodata");
+        STR_MEM_BLOCKS_MAP.put(PeLoader.PE_NAME, ".rdata");
+        STR_MEM_BLOCKS_MAP.put(MachoLoader.MACH_O_NAME, "__rodata");
     }
 
     private GhostringsUtil() {
@@ -53,7 +57,7 @@ public class GhostringsUtil {
     }
 
     public static List<String> goStringSymbols(Program program) {
-        if ("Mac OS X Mach-O".equals(program.getExecutableFormat())) {
+        if (MachoLoader.MACH_O_NAME.equals(program.getExecutableFormat())) {
             // Mach-O uses `_go.string.*`
             return Arrays.asList("_go.string.*", "_go:string.*");
         }
@@ -63,7 +67,7 @@ public class GhostringsUtil {
     }
 
     public static List<String> goFuncSymbols(Program program) {
-        if ("Mac OS X Mach-O".equals(program.getExecutableFormat())) {
+        if (MachoLoader.MACH_O_NAME.equals(program.getExecutableFormat())) {
             // Mach-O uses `_go.func.*`
             return Arrays.asList("_go.func.*", "_go:func.*");
         }
@@ -116,6 +120,15 @@ public class GhostringsUtil {
         return block.getName();
     }
 
+    public static String roDataBlockName(Program program) {
+        String progFormat = program.getExecutableFormat();
+        if (progFormat == null) {
+            return null;
+        }
+
+        return STR_MEM_BLOCKS_MAP.get(progFormat);
+    }
+
     /**
      * Check if address is in a memory block where string data is stored (e.g., rodata).
      * @param program Program reference
@@ -124,7 +137,16 @@ public class GhostringsUtil {
      */
     public static boolean isAddrInStringMemBlock(Program program, Address addr) {
         String blockName = GhostringsUtil.memBlockName(program, addr);
-        return STR_MEM_BLOCKS.contains(blockName);
+        if (blockName == null) {
+            return false;
+        }
+
+        String progRoBlockName = roDataBlockName(program);
+        if (progRoBlockName == null) {
+            return false;
+        }
+
+        return progRoBlockName.equals(blockName);
     }
 
     /**
