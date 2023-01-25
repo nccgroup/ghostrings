@@ -22,14 +22,11 @@
 //@menupath 
 //@toolbar 
 
-import java.util.List;
-
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
-import ghidra.program.model.symbol.Symbol;
 import ghidra.util.BigEndianDataConverter;
 import ghidra.util.DataConverter;
 import ghidra.util.LittleEndianDataConverter;
@@ -46,16 +43,6 @@ public class GoStaticStrings extends GhidraScript {
     private DataConverter dataConverter;
     private GolangProgramInfo golangInfo;
 
-    static String hexAscii(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < bytes.length; i++) {
-            sb.append(String.format("%02x", bytes[i]));
-        }
-
-        return sb.toString();
-    }
-
     protected void checkBlock(MemoryBlock roBlock) throws MemoryAccessException {
         Address blockStart = roBlock.getStart();
         Address blockEnd = roBlock.getEnd();
@@ -70,49 +57,53 @@ public class GoStaticStrings extends GhidraScript {
             if (monitor.isCancelled())
                 break;
 
+            // Check for address
             byte[] addrBytes = new byte[ptrSize];
-            if (roBlock.getBytes(curAddr, addrBytes) == ptrSize) {
-                // check if it looks like an address,
-                // check for length value after possible address,
-                // then check for string data
-                long addrInt = dataConverter.getValue(addrBytes, addrBytes.length);
+            if (roBlock.getBytes(curAddr, addrBytes) != ptrSize) {
+                printf("read fewer bytes than expected\n");
+                return;
+            }
 
-                //printf("%s = 0x%x\n", hexAscii(addrBytes), addrInt);
+            long addrInt = dataConverter.getValue(addrBytes, addrBytes.length);
 
-                Address addr;
+            Address addr;
+            try {
+                addr = PcodeUtil.addrFromLong(currentProgram, addrInt);
+            } catch (AddressOutOfBoundsException e) {
+                continue;
+            }
+
+            // Use go.string boundary info if available
+            if (!golangInfo.isAddrInStringData(addr)) {
+                continue;
+            }
+
+            // Check for length value
+            byte[] lenBytes = new byte[ptrSize];
+            if (roBlock.getBytes(curAddr.add(ptrSize), lenBytes) != ptrSize) {
+                printf("read fewer bytes than expected\n");
+                return;
+            }
+
+            Long lenInt = dataConverter.getValue(lenBytes, lenBytes.length);
+            int length = lenInt.intValue();
+
+            if (length <= 0) {
+                continue;
+            }
+
+            // Try ptr/len pair as string
+            String checkStr = GhostringsUtil.checkForString(currentProgram, addr, length);
+            if (checkStr != null) {
                 try {
-                    addr = PcodeUtil.addrFromLong(currentProgram, addrInt);
-                } catch (AddressOutOfBoundsException e) {
-                    continue;
-                }
-
-                // Use go.string boundary info if available
-                if (!golangInfo.isAddrInStringData(addr)) {
-                    continue;
-                }
-
-                byte[] lenBytes = new byte[ptrSize];
-                if (roBlock.getBytes(curAddr.add(ptrSize), lenBytes) == ptrSize) {
-                    Long lenInt = dataConverter.getValue(lenBytes, lenBytes.length);
-                    int length = lenInt.intValue();
-
-                    if (length <= 0) {
-                        continue;
+                    if (GhostringsUtil.tryDefString(this, addr, checkStr, 0)) {
+                        printf("Defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
                     }
-
-                    String checkStr = GhostringsUtil.checkForString(currentProgram, addr, length);
-                    if (checkStr != null) {
-                        try {
-                            if (GhostringsUtil.tryDefString(this, addr, checkStr, 0)) {
-                                printf("Defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
-                            }
-                        } catch (DuplicateDataException e) {
-                            // This exact string is already defined
-                            printf("Already defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
-                        } catch (Exception e) {
-                            printf("Define failed with exception: %s\n", e.getMessage());
-                        }
-                    }
+                } catch (DuplicateDataException e) {
+                    // This exact string is already defined
+                    printf("Already defined @ %s: %s\n", addr, StringUtilities.convertControlCharsToEscapeSequences(checkStr));
+                } catch (Exception e) {
+                    printf("Define failed with exception: %s\n", e.getMessage());
                 }
             }
         }
