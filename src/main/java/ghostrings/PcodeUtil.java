@@ -123,25 +123,28 @@ public class PcodeUtil {
      * @return Stack offset long or null
      * @throws UnhandledOpArgsException
      */
-    public static Long intAddStackOffset(Program program, PcodeOp op) throws UnhandledOpArgsException {
+    public static Long intAddStackOffset(FlatProgramAPI flatProgramAPI, PcodeOp op) {
         if (op.getOpcode() != PcodeOp.INT_ADD) {
             throw new IllegalArgumentException("Wrong op type");
         }
 
         // input 0: should be an SP register
         Varnode regVarnode = op.getInput(0);
-        if (!isStackRegister(program, regVarnode)) {
+        if (!isStackRegister(flatProgramAPI.getCurrentProgram(), regVarnode)) {
             return null;
         }
 
         // input 1: constant is the offset from SP
         Varnode offsetVarnode = op.getInput(1);
-        if (!offsetVarnode.isConstant()) {
-            // TODO: Input could be a register, which might have a defining op with a constant
-            throw new UnhandledOpArgsException("Unhandled INT_ADD args");
+        List<Long> constants = PcodeUtil.getConstantInputs(flatProgramAPI, offsetVarnode);
+        if (constants.isEmpty()) {
+            return null;
+        } else if (constants.size() == 1) {
+            return constants.get(0);
+        } else {
+            // TODO: handle multiple constants
+            return null;
         }
-
-        return offsetVarnode.getOffset();
     }
 
     /**
@@ -151,7 +154,7 @@ public class PcodeUtil {
      * @throws UnhandledOpTypeException Op with stack register input has no handler
      * @throws UnhandledOpArgsException Unhandled inputs for op with stack input
      */
-    public static Long outputStackOffset(Program program, Varnode storeLoc)
+    public static Long outputStackOffset(FlatProgramAPI flatProgramAPI, Varnode storeLoc)
             throws UnhandledOpTypeException, UnhandledOpArgsException {
         PcodeOp defineOp = storeLoc.getDef();
         if (defineOp == null)
@@ -160,12 +163,15 @@ public class PcodeUtil {
         // So far, it's always been INT_ADD
         switch (defineOp.getOpcode()) {
         case PcodeOp.INT_ADD:
-            return intAddStackOffset(program, defineOp);
+            return intAddStackOffset(flatProgramAPI, defineOp);
         }
 
+        // TODO: Could have a MULTIEQUAL here with an input that's
+        // a stack register defined by an INT_ADD (sp, offset)
+
         // The only use for this is to detect unhandled cases
-        if (hasStackInput(program, defineOp)) {
-            throw new UnhandledOpTypeException("Unhandled op type");
+        if (hasStackInput(flatProgramAPI.getCurrentProgram(), defineOp)) {
+            throw new UnhandledOpTypeException("Unhandled op has stack register input: " + defineOp);
         }
 
         return null;
@@ -205,6 +211,11 @@ public class PcodeUtil {
     private static List<Long> getConstantInputs(FlatProgramAPI programAPI, Varnode varnode, long depth) {
         List<Long> results = new LinkedList<>();
 
+        // TODO check for cycles instead of simple max depth check?
+        if (depth == MAX_RECURSION_DEPTH) {
+            return results;
+        }
+
         if (varnode.isConstant()) {
             results.add(varnode.getOffset());
         } else if (varnode.isRegister() && varnode.getDef() != null) {
@@ -237,19 +248,13 @@ public class PcodeUtil {
             case PcodeOp.COPY:
                 // Noted for multiequal possible register values
                 Varnode copyInput = def.getInput(0);
-                if (copyInput.isConstant()) {
-                    results.add(copyInput.getOffset());
-                }
-                // TODO if a register, recursively resolve?
+                results.addAll(getConstantInputs(programAPI, copyInput, depth + 1));
                 break;
 
             case PcodeOp.MULTIEQUAL:
                 // Recursively resolve multiequals input constants
-                // TODO check for cycles instead of simple max depth check?
-                if (depth < MAX_RECURSION_DEPTH) {
-                    for (Varnode multiInput : def.getInputs()) {
-                        results.addAll(getConstantInputs(programAPI, multiInput, depth + 1));
-                    }
+                for (Varnode multiInput : def.getInputs()) {
+                    results.addAll(getConstantInputs(programAPI, multiInput, depth + 1));
                 }
                 break;
             }

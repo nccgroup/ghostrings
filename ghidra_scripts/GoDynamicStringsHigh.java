@@ -91,7 +91,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
     }
 
     @Override
-    protected List<AddressCandidate> storeDataCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<AddressCandidate> storeDataCheck(PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.COPY)
             return null;
 
@@ -119,7 +119,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
         for (Long constant : constants) {
             Address addr;
             try {
-                addr = PcodeUtil.addrFromLong(program, constant);
+                addr = PcodeUtil.addrFromLong(currentProgram, constant);
             } catch (AddressOutOfBoundsException e) {
                 // Nothing to do if it's not a valid address
                 continue;
@@ -145,7 +145,7 @@ public class GoDynamicStringsHigh extends GoDynamicStrings {
     }
 
     @Override
-    protected List<LengthCandidate> storeLenCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<LengthCandidate> storeLenCheck(PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.COPY)
             return null;
 

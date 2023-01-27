@@ -182,7 +182,7 @@ public class GoDynamicStrings extends GhidraScript {
                 pcodeOpAST.toString());
     }
 
-    protected List<AddressCandidate> storeDataCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<AddressCandidate> storeDataCheck(PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.STORE)
             return null;
 
@@ -197,7 +197,7 @@ public class GoDynamicStrings extends GhidraScript {
 
         Long stackOffset = null;
         try {
-            stackOffset = PcodeUtil.outputStackOffset(program, storeLoc);
+            stackOffset = PcodeUtil.outputStackOffset(this, storeLoc);
         } catch (UnhandledOpTypeException | UnhandledOpArgsException e) {
             println(e.getMessage());
         }
@@ -216,7 +216,7 @@ public class GoDynamicStrings extends GhidraScript {
         for (Long constant : constants) {
             Address addr;
             try {
-                addr = PcodeUtil.addrFromLong(program, constant);
+                addr = PcodeUtil.addrFromLong(currentProgram, constant);
             } catch (AddressOutOfBoundsException e) {
                 // Nothing to do if it's not a valid address
                 continue;
@@ -227,7 +227,7 @@ public class GoDynamicStrings extends GhidraScript {
                 continue;
 
             if (getVerbose() > 0) {
-                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, currentProgram.getAddressFactory());
                 printf("copy %s to addr. %s\n", addr.toString(), destAddr.toString(true));
             }
 
@@ -242,7 +242,7 @@ public class GoDynamicStrings extends GhidraScript {
         return results;
     }
 
-    protected List<LengthCandidate> storeLenCheck(Program program, PcodeOpAST pcodeOpAST) {
+    protected List<LengthCandidate> storeLenCheck(PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.STORE)
             return null;
 
@@ -257,7 +257,7 @@ public class GoDynamicStrings extends GhidraScript {
 
         Long stackOffset = null;
         try {
-            stackOffset = PcodeUtil.outputStackOffset(program, storeLoc);
+            stackOffset = PcodeUtil.outputStackOffset(this, storeLoc);
         } catch (UnhandledOpTypeException | UnhandledOpArgsException e) {
             println(e.getMessage());
         }
@@ -280,7 +280,7 @@ public class GoDynamicStrings extends GhidraScript {
             }
 
             if (getVerbose() > 0) {
-                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, program.getAddressFactory());
+                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, currentProgram.getAddressFactory());
 
                 printf("copy constant 0x%x to addr. %s\n",
                         constant,
@@ -338,7 +338,7 @@ public class GoDynamicStrings extends GhidraScript {
 
             // Check for string address or length store
             // Currently returns null or list with values, no empty list
-            List<AddressCandidate> addrCheck = storeDataCheck(currentProgram, pcodeOpAST);
+            List<AddressCandidate> addrCheck = storeDataCheck(pcodeOpAST);
             if (addrCheck != null) {
                 opIdentified = true;
                 storeData = addrCheck;
@@ -349,7 +349,7 @@ public class GoDynamicStrings extends GhidraScript {
                     storeLen = null;
                 }
             } else {
-                List<LengthCandidate> lenCheck = storeLenCheck(currentProgram, pcodeOpAST);
+                List<LengthCandidate> lenCheck = storeLenCheck(pcodeOpAST);
                 if (lenCheck != null) {
                     opIdentified = true;
                     if (storeLen != null) {
