@@ -33,7 +33,7 @@ import ghidra.app.decompiler.DecompileResults;
 import ghidra.app.script.GhidraScript;
 import ghidra.framework.options.ToolOptions;
 import ghidra.framework.plugintool.PluginTool;
-import ghidra.framework.plugintool.util.OptionsService;
+import docking.options.OptionsService;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.PcodeOpAST;

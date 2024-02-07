@@ -39,7 +39,7 @@ import ghidra.app.decompiler.DecompileOptions;
 import ghidra.app.script.GhidraState;
 import ghidra.framework.options.ToolOptions;
 import ghidra.framework.plugintool.PluginTool;
-import ghidra.framework.plugintool.util.OptionsService;
+import docking.options.OptionsService;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
 import ghidra.program.model.listing.Program;
