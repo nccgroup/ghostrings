@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
@@ -56,51 +57,19 @@ public class GoFuncCallStrings extends GoDynamicStrings {
         return SIMPLIFICATION_STYLE;
     }
 
-    protected List<AddressCandidate> filterAddresses(List<Long> constants, PcodeOpAST pcodeOpAST) {
-        List<AddressCandidate> results = new LinkedList<>();
-
-        for (Long constant : constants) {
-            Address addr;
-            try {
-                addr = PcodeUtil.addrFromLong(currentProgram, constant);
-            } catch (AddressOutOfBoundsException e) {
-                // Nothing to do if it's not a valid address
-                continue;
-            }
-
-            // Check if the address is in a memory block where string data is stored.
-            if (!getGolangInfo().isAddrInStringData(addr))
-                continue;
-
-            AddressCandidate result = new AddressCandidate(addr, 0xdeadbeef, pcodeOpAST);
-            results.add(result);
-        }
-
-        if (results.isEmpty()) {
-            return null;
-        }
-
-        return results;
+    protected List<Address> filterAddressConstants(List<Long> constants) {
+        return constants.stream()
+                .map(c -> PcodeUtil.addrOrNullFromLong(currentProgram, c))
+                .filter(addr -> addr != null)
+                .filter(addr -> getGolangInfo().isAddrInStringData(addr))
+                .collect(Collectors.toList());
     }
 
-    protected List<LengthCandidate> filterLengths(List<Long> constants, PcodeOpAST pcodeOpAST) {
-        List<LengthCandidate> results = new LinkedList<>();
-
-        for (Long constant : constants) {
-            // Simple string length bounds check
-            if (constant < MIN_STR_LEN || constant > MAX_STR_LEN) {
-                continue;
-            }
-
-            LengthCandidate result = new LengthCandidate(constant.intValue(), 0xdeadbeef, pcodeOpAST);
-            results.add(result);
-        }
-
-        if (results.isEmpty()) {
-            return null;
-        }
-
-        return results;
+    protected List<Integer> filterLengthConstants(List<Long> constants) {
+        return constants.stream()
+                .filter(c -> c >= MIN_STR_LEN && c <= MAX_STR_LEN)
+                .map(c -> c.intValue())
+                .collect(Collectors.toList());
     }
 
     protected List<CandidateGroup> callParamsCheck(PcodeOpAST pcodeOpAST) {
@@ -123,15 +92,19 @@ public class GoFuncCallStrings extends GoDynamicStrings {
                 continue;
             }
 
-            List<AddressCandidate> addrs = filterAddresses(constants, pcodeOpAST);
-            if (addrs != null) {
-                addrCandidates.addAll(addrs);
+            List<Address> addrs = filterAddressConstants(constants);
+            if (!addrs.isEmpty()) {
+                addrCandidates.addAll(addrs.stream()
+                        .map(addr -> new AddressCandidate(addr, 0xdeadbeef, pcodeOpAST))
+                        .collect(Collectors.toList()));
                 continue;
             }
 
-            List<LengthCandidate> lens = filterLengths(constants, pcodeOpAST);
-            if (lens != null) {
-                lenCandidates.addAll(lens);
+            List<Integer> lens = filterLengthConstants(constants);
+            if (!lens.isEmpty()) {
+                lenCandidates.addAll(lens.stream()
+                        .map(len -> new LengthCandidate(len, 0xdeadbeef, pcodeOpAST))
+                        .collect(Collectors.toList()));
             }
         }
 

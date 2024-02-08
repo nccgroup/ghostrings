@@ -57,13 +57,31 @@ public class PcodeUtil {
      * Uses the integer as an offset in the program's default address space.
      * @param program Program to create an address for
      * @param offset Address as integer
-     * @return
+     * @return Address object
      * @throws AddressOutOfBoundsException
      */
     public static Address addrFromLong(Program program, long offset) throws AddressOutOfBoundsException {
         // Use the value as an address in the program's default address space
         AddressSpace defaultAddrSpace = program.getAddressFactory().getDefaultAddressSpace();
         return defaultAddrSpace.getAddress(offset);
+    }
+
+    /**
+     * Convenience function to create address object from address integer value.
+     * Uses the integer as an offset in the program's default address space.
+     * Returns null instead of throwing address-related exceptions.
+     * @param program Program to create an address for
+     * @param offset Address as integer
+     * @return Address object or null
+     */
+    public static Address addrOrNullFromLong(Program program, long offset) {
+        Address addr;
+        try {
+            addr = addrFromLong(program, offset);
+        } catch (AddressOutOfBoundsException e) {
+            return null;
+        }
+        return addr;
     }
 
     /**
