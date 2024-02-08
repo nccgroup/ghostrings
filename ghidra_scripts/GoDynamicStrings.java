@@ -30,7 +30,9 @@
 //@menupath 
 //@toolbar 
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -60,6 +62,7 @@ import ghidra.util.StringUtilities;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 import ghostrings.AddressCandidate;
+import ghostrings.CandidateGroup;
 import ghostrings.GhostringsUtil;
 import ghostrings.GolangProgramInfo;
 import ghostrings.LengthCandidate;
@@ -299,13 +302,6 @@ public class GoDynamicStrings extends GhidraScript {
     }
 
     protected String checkForString(AddressCandidate addrCandidate, LengthCandidate lenCandidate) {
-        final int ptrSize = currentProgram.getDefaultPointerSize();
-
-        // Length value should be right after the address on the stack
-        if (lenCandidate.getStackOffset() - addrCandidate.getStackOffset() != ptrSize) {
-            return null;
-        }
-
         return GhostringsUtil.checkForString(
                 currentProgram,
                 addrCandidate.getStringAddr(),
@@ -387,13 +383,57 @@ public class GoDynamicStrings extends GhidraScript {
     }
 
     /**
+     * Group addr/length candidates by stack offset.
+     * @param storeData
+     * @param storeLen
+     * @return List of groups of address/length values with corresponding stack offsets.
+     */
+    protected List<CandidateGroup> groupCandidatesByStackOffset(List<AddressCandidate> storeData, List<LengthCandidate> storeLen) {
+        List<CandidateGroup> results = new ArrayList<>();
+
+        HashMap<Long, List<AddressCandidate>> addrListMap = new HashMap<>();
+        HashMap<Long, List<LengthCandidate>> lenListMap = new HashMap<>();
+
+        storeData.forEach((x) -> {
+            // Address should be right before length value on the stack
+            // make addr offset equivalent to corresponding len offset for grouping
+            Long key = x.getStackOffset() + currentProgram.getDefaultPointerSize();
+            if (!addrListMap.containsKey(key)) {
+                addrListMap.put(key, new ArrayList<AddressCandidate>());
+            }
+            addrListMap.get(key).add(x);
+        });
+
+        storeLen.forEach((x) -> {
+            Long key = x.getStackOffset();
+            if (!lenListMap.containsKey(key)) {
+                lenListMap.put(key, new ArrayList<LengthCandidate>());
+            }
+            lenListMap.get(key).add(x);
+        });
+
+        for (Long key: lenListMap.keySet()) {
+            if (addrListMap.containsKey(key)) {
+                CandidateGroup group = new CandidateGroup(
+                        addrListMap.get(key), lenListMap.get(key));
+                results.add(group);
+            }
+        }
+
+        return results;
+    }
+
+    /**
      * Use list of one or more address candidates with list of one or more length candidates
      * to attempt to find string data.
-     * @param addresses Non-empty address candidate list
-     * @param lengths Non-empty length candidate list
+     * @param storeData Non-empty address candidate list
+     * @param storeLen Non-empty length candidate list
      * @return Whether any strings were found
      */
-    protected boolean tryCandidates(List<AddressCandidate> storeData, List<LengthCandidate> storeLen) {
+    protected boolean tryCandidateGroup(CandidateGroup group) {
+        final List<AddressCandidate> storeData = group.getAddresses();
+        final List<LengthCandidate> storeLen = group.getLengths();
+
         boolean hasFinds = false;
 
         if (storeLen.size() == 1 && !storeData.isEmpty()) {
@@ -416,12 +456,6 @@ public class GoDynamicStrings extends GhidraScript {
             //   so check for maximum working length value.
             AddressCandidate addressCandidate = storeData.get(0);
 
-            // Sort lengths in descending order
-            storeLen.sort((l1, l2) -> {
-                return Long.compare(l2.getStringLength(),
-                        l1.getStringLength());
-            });
-
             for (LengthCandidate curLen : storeLen) {
                 String checkString = checkForString(addressCandidate, curLen);
                 if (checkString != null) {
@@ -438,16 +472,6 @@ public class GoDynamicStrings extends GhidraScript {
             // Can take advantage of the string ordering to help somewhat.
 
             if (storeLen.size() == storeData.size()) {
-                // Put both lists in descending order
-                storeLen.sort((l1, l2) -> {
-                    return Long.compare(l2.getStringLength(),
-                            l1.getStringLength());
-                });
-
-                storeData.sort((l1, l2) -> {
-                    return l2.getStringAddr().compareTo(l1.getStringAddr());
-                });
-
                 for (int i = 0; i < storeLen.size(); i++) {
                     AddressCandidate addr = storeData.get(i);
                     LengthCandidate len = storeLen.get(i);
@@ -465,6 +489,37 @@ public class GoDynamicStrings extends GhidraScript {
                 // lengths get consolidated?
                 printf("mismatched number of lens (%d) and addrs (%d)\n",
                         storeLen.size(), storeData.size());
+            }
+        }
+
+        return hasFinds;
+    }
+
+    /**
+     * Use list of one or more address candidates with list of one or more length candidates
+     * to attempt to find string data.
+     * @param storeData Non-empty address candidate list
+     * @param storeLen Non-empty length candidate list
+     * @return Whether any strings were found
+     */
+    protected boolean tryCandidates(List<AddressCandidate> storeData, List<LengthCandidate> storeLen) {
+        boolean hasFinds = false;
+
+        // Put both lists in descending order
+        storeLen.sort((l1, l2) -> {
+            return Long.compare(l2.getStringLength(),
+                    l1.getStringLength());
+        });
+
+        storeData.sort((l1, l2) -> {
+            return l2.getStringAddr().compareTo(l1.getStringAddr());
+        });
+
+        List<CandidateGroup> groups = groupCandidatesByStackOffset(storeData, storeLen);
+
+        for (CandidateGroup group: groups) {
+            if (tryCandidateGroup(group)) {
+                hasFinds = true;
             }
         }
 
