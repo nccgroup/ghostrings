@@ -11,6 +11,8 @@ These can be found in the Golang category in the Script Manager.
 
 * `GoDynamicStrings.java`
   * Analyzes P-Code to find string structures created on the stack. Uses the lower level "register" style analysis.
+* `GoFuncCallStrings.java`
+  * Analyze P-Code to find string structures passed directly to function calls via registers, without being written to the stack. Uses "normalize" style analysis with Ghidra's new built-in Golang support (see Ghidra release notes for supported Golang versions).
 * `GoStaticStrings.java`
   * Find Go string structures statically allocated in read-only memory.
 * `GoKnownStrings.java`
@@ -42,15 +44,16 @@ Here’s the general flow for using these scripts to recover string definitions 
    * In the "Defined Strings" window, enable the "Mem Block" column and filter by memory block to select all strings in `.rodata`, `.rdata`, or `__rodata`. Then right-click in the code listing and choose "Clear Code Bytes".
 2. *(Optional)* Run `GoKnownStrings.java` to detect some standard strings.
 3. Run `GoStaticStrings.java`.
-4. Run `GoDynamicStrings.java`.
-5. Run `GoStringFiller.java`.
+4. Run `GoFuncCallStrings.java` *(if the Golang binary version is supported by Ghidra's built-in Golang features)*.
+5. Run `GoDynamicStrings.java`.
+6. Run `GoStringFiller.java`.
    * If it detects a violation of the ascending length order of string data, clear any false positive string definitions in that area and re-run the script. There is an option to do this automatically.
    * If the binary is stripped, locate the area of one byte strings found by the dynamic strings script.
      Ensure it's the start of the grouped together non-null-terminated strings (more strings should be defined after with length in ascending order).
      Create the label `go.string.*` at the first one byte string.
-6. Check for remaining gaps in `go.string.*`, and define any strings with obvious start and end points.
+7. Check for remaining gaps in `go.string.*`, and define any strings with obvious start and end points.
    * To make the most use of `GoStringFiller.java`, identify where the string lengths are changing over in undefined string data and define the strings closest to that boundary. Then re-run `GoStringFiller.java` to automatically fill in spots where it can correctly determine the length of remaining undefined strings.
-7. *(Optional)* Re-run Ghidra's built-in ASCII String analysis tool.
+8. *(Optional)* Re-run Ghidra's built-in ASCII String analysis tool.
    * Disable overwriting existing strings. Run with and then without the null terminator requirement.
 
 
