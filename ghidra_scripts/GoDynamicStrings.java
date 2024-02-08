@@ -434,6 +434,16 @@ public class GoDynamicStrings extends GhidraScript {
         final List<AddressCandidate> storeData = group.getAddresses();
         final List<LengthCandidate> storeLen = group.getLengths();
 
+        // Put both lists in descending order
+        storeLen.sort((l1, l2) -> {
+            return Long.compare(l2.getStringLength(),
+                    l1.getStringLength());
+        });
+
+        storeData.sort((l1, l2) -> {
+            return l2.getStringAddr().compareTo(l1.getStringAddr());
+        });
+
         boolean hasFinds = false;
 
         if (storeLen.size() == 1 && !storeData.isEmpty()) {
@@ -504,16 +514,6 @@ public class GoDynamicStrings extends GhidraScript {
      */
     protected boolean tryCandidates(List<AddressCandidate> storeData, List<LengthCandidate> storeLen) {
         boolean hasFinds = false;
-
-        // Put both lists in descending order
-        storeLen.sort((l1, l2) -> {
-            return Long.compare(l2.getStringLength(),
-                    l1.getStringLength());
-        });
-
-        storeData.sort((l1, l2) -> {
-            return l2.getStringAddr().compareTo(l1.getStringAddr());
-        });
 
         List<CandidateGroup> groups = groupCandidatesByStackOffset(storeData, storeLen);
 
