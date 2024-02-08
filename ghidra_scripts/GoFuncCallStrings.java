@@ -57,21 +57,6 @@ public class GoFuncCallStrings extends GoDynamicStrings {
         return SIMPLIFICATION_STYLE;
     }
 
-    protected List<Address> filterAddressConstants(List<Long> constants) {
-        return constants.stream()
-                .map(c -> PcodeUtil.addrOrNullFromLong(currentProgram, c))
-                .filter(addr -> addr != null)
-                .filter(addr -> getGolangInfo().isAddrInStringData(addr))
-                .collect(Collectors.toList());
-    }
-
-    protected List<Integer> filterLengthConstants(List<Long> constants) {
-        return constants.stream()
-                .filter(c -> c >= MIN_STR_LEN && c <= MAX_STR_LEN)
-                .map(c -> c.intValue())
-                .collect(Collectors.toList());
-    }
-
     protected List<CandidateGroup> callParamsCheck(PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.CALL)
             return null;

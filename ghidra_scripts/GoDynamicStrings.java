@@ -37,6 +37,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.decompiler.DecompileOptions;
@@ -185,6 +186,21 @@ public class GoDynamicStrings extends GhidraScript {
                 pcodeOpAST.toString());
     }
 
+    protected List<Address> filterAddressConstants(List<Long> constants) {
+        return constants.stream()
+                .map(c -> PcodeUtil.addrOrNullFromLong(currentProgram, c))
+                .filter(addr -> addr != null)
+                .filter(addr -> getGolangInfo().isAddrInStringData(addr))
+                .collect(Collectors.toList());
+    }
+
+    protected List<Integer> filterLengthConstants(List<Long> constants) {
+        return constants.stream()
+                .filter(c -> c >= MIN_STR_LEN && c <= MAX_STR_LEN)
+                .map(c -> c.intValue())
+                .collect(Collectors.toList());
+    }
+
     protected List<AddressCandidate> storeDataCheck(PcodeOpAST pcodeOpAST) {
         if (pcodeOpAST.getOpcode() != PcodeOp.STORE)
             return null;
@@ -216,27 +232,10 @@ public class GoDynamicStrings extends GhidraScript {
         // Filter addresses
         List<AddressCandidate> results = new LinkedList<>();
 
-        for (Long constant : constants) {
-            Address addr;
-            try {
-                addr = PcodeUtil.addrFromLong(currentProgram, constant);
-            } catch (AddressOutOfBoundsException e) {
-                // Nothing to do if it's not a valid address
-                continue;
-            }
-
-            // Check if the address is in a memory block where string data is stored.
-            if (!getGolangInfo().isAddrInStringData(addr))
-                continue;
-
-            if (getVerbose() > 0) {
-                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, currentProgram.getAddressFactory());
-                printf("copy %s to addr. %s\n", addr.toString(), destAddr.toString(true));
-            }
-
-            AddressCandidate result = new AddressCandidate(addr, stackOffset, pcodeOpAST);
-            results.add(result);
-        }
+        final long finalStackOffset = stackOffset;
+        results.addAll(filterAddressConstants(constants).stream()
+                .map(addr -> new AddressCandidate(addr, finalStackOffset, pcodeOpAST))
+                .collect(Collectors.toList()));
 
         if (results.isEmpty()) {
             return null;
@@ -276,23 +275,10 @@ public class GoDynamicStrings extends GhidraScript {
         // Filter constants
         List<LengthCandidate> results = new LinkedList<>();
 
-        for (Long constant : constants) {
-            // Simple string length bounds check
-            if (constant < MIN_STR_LEN || constant > MAX_STR_LEN) {
-                continue;
-            }
-
-            if (getVerbose() > 0) {
-                Address destAddr = PcodeUtil.getLoadStoreAddr(pcodeOpAST, currentProgram.getAddressFactory());
-
-                printf("copy constant 0x%x to addr. %s\n",
-                        constant,
-                        destAddr.toString(true));
-            }
-
-            LengthCandidate result = new LengthCandidate(constant.intValue(), stackOffset, pcodeOpAST);
-            results.add(result);
-        }
+        final long finalStackOffset = stackOffset;
+        results.addAll(filterLengthConstants(constants).stream()
+                .map(len -> new LengthCandidate(len, finalStackOffset, pcodeOpAST))
+                .collect(Collectors.toList()));
 
         if (results.isEmpty()) {
             return null;
