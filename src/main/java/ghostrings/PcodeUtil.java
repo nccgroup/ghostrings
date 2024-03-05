@@ -234,12 +234,12 @@ public class PcodeUtil {
             return results;
         }
 
+        PcodeOp def = varnode.getDef();
+
         if (varnode.isConstant()) {
             results.add(varnode.getOffset());
-        } else if (varnode.isRegister() && varnode.getDef() != null) {
+        } else if (varnode.isRegister() && def != null) {
             // Register may hold a constant
-            PcodeOp def = varnode.getDef();
-
             switch (def.getOpcode()) {
             case PcodeOp.LOAD:
                 // Check for LOAD op that loaded a constant into the register,
@@ -275,6 +275,10 @@ public class PcodeUtil {
                     results.addAll(getConstantInputs(programAPI, multiInput, depth + 1));
                 }
                 break;
+            }
+        } else if (def != null && def.getOpcode() == PcodeOp.PIECE) {
+            for (Varnode pieceInput: def.getInputs()) {
+                results.addAll(getConstantInputs(programAPI, pieceInput, depth + 1));
             }
         }
 

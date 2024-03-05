@@ -82,7 +82,9 @@ public class GoFuncCallStrings extends GoDynamicStrings {
                 addrCandidates.addAll(addrs.stream()
                         .map(addr -> new AddressCandidate(addr, 0xdeadbeef, pcodeOpAST))
                         .collect(Collectors.toList()));
-                continue;
+                constants.removeAll(addrs.stream()
+                        .map(addr -> addr.getOffset())
+                        .collect(Collectors.toList()));
             }
 
             List<Integer> lens = filterLengthConstants(constants);
