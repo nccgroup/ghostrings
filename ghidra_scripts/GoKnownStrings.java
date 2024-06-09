@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -38,11 +39,13 @@ import generic.jar.ResourceFile;
 import ghidra.app.script.GhidraScript;
 import ghidra.framework.Application;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.listing.Data;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.util.CodeUnitInsertionException;
 import ghidra.util.StringUtilities;
+import ghidra.util.exception.CancelledException;
 import ghostrings.GolangProgramInfo;
 
 public class GoKnownStrings extends GhidraScript {
@@ -78,7 +81,11 @@ public class GoKnownStrings extends GhidraScript {
             ArrayList<KnownString> jsonData = gson.fromJson(
                     reader,
                     new TypeToken<ArrayList<KnownString>>() {}.getType());
-            KNOWN_STRINGS.addAll(jsonData);
+
+            KNOWN_STRINGS.addAll(jsonData.stream().
+                    filter(ks -> ks != null).
+                    sorted((ks1, ks2) -> Integer.valueOf(ks2.value.length()).compareTo(ks1.value.length())).
+                    collect(Collectors.toList()));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -104,11 +111,7 @@ public class GoKnownStrings extends GhidraScript {
     private String escapedUtf8String(byte[] utf8bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : utf8bytes) {
-            if (StringUtilities.isAsciiChar(b)) {
-                sb.append((char) (b & 0xff));
-            } else {
-                sb.append(String.format("\\x%02x", b));
-            }
+            sb.append(String.format("\\x%02x", b));
         }
         return sb.toString();
     }
@@ -119,13 +122,14 @@ public class GoKnownStrings extends GhidraScript {
      * 
      * @throws MemoryAccessException
      */
-    private Data findAndDefineString(Address startAddr, String target) throws MemoryAccessException {
+    private Data findAndDefineString(AddressSet searchRange, String target) throws MemoryAccessException {
         // TODO: findBytes input string can contain regex, escape any regex characters
         byte[] utf8bytes = target.getBytes(StandardCharsets.UTF_8);
-        String escapedUtf8 = escapedUtf8String(utf8bytes);
         int byteLen = utf8bytes.length;
 
-        Address[] results = findBytes(startAddr, escapedUtf8, 2);
+        String escapedString = escapedUtf8String(utf8bytes);
+
+        Address[] results = findBytes(searchRange, escapedString, 2, 1, false);
         if (results == null || results.length == 0) {
             if (verbose) {
                 println("Target string not found");
@@ -152,6 +156,7 @@ public class GoKnownStrings extends GhidraScript {
         }
 
         // Clear all conflicting data defined within the string
+        /*
         Address endAddr = result.add(byteLen);
         try {
             while (conflict != null && conflict.getAddress().compareTo(result) > -1) {
@@ -163,6 +168,7 @@ public class GoKnownStrings extends GhidraScript {
             e.printStackTrace();
             return null;
         }
+        */
 
         try {
             return createAsciiString(result, byteLen);
@@ -182,26 +188,30 @@ public class GoKnownStrings extends GhidraScript {
 
         GolangProgramInfo golangInfo = new GolangProgramInfo(this, true);
 
-        final List<Symbol> results = golangInfo.getGoStringSymbols();
-        if (results.size() != 1) {
-            final String msg = String.format(
-                    "Want a single go.string.* symbol, found %d", results.size());
-            println(msg);
-            popup(msg);
-            return;
-        }
+        Address strStart = golangInfo.getStringDataStart();
+        Address strEnd = golangInfo.getStringDataEnd();
+        AddressSet searchRange = new AddressSet(strStart, strEnd);
 
-        final Symbol goStringsBlob = results.get(0);
-        final String goStringSym = goStringsBlob.getName();
-        Address blobAddr = goStringsBlob.getAddress();
-        printf("%s @ %s\n", goStringSym, blobAddr);
+        printf("loaded %d strings\n", KNOWN_STRINGS.size());
+        printf("searching %s to %s\n", strStart.toString(), strEnd.toString());
 
-        for (KnownString knownString : KNOWN_STRINGS) {
-            Data strData = findAndDefineString(blobAddr, knownString.value);
-            if (strData != null) {
-                println("Found and defined " + knownString.name);
-                printStringData(strData);
+        monitor.setIndeterminate(false);
+        monitor.setMaximum(KNOWN_STRINGS.size());
+        monitor.setProgress(0);
+
+        try {
+            for (KnownString knownString : KNOWN_STRINGS) {
+                monitor.setMessage(knownString.name);
+                Data strData = findAndDefineString(searchRange, knownString.value);
+                if (strData != null) {
+                    println("Found and defined " + knownString.name);
+                    printStringData(strData);
+                }
+
+                monitor.increment();
             }
+        } catch (CancelledException e) {
+            return;
         }
     }
 }
