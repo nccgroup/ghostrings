@@ -108,40 +108,31 @@ public class GoKnownStrings extends GhidraScript {
                 StringUtilities.convertControlCharsToEscapeSequences(strData));
     }
 
-    private String escapedUtf8String(byte[] utf8bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : utf8bytes) {
-            sb.append(String.format("\\x%02x", b));
-        }
-        return sb.toString();
-    }
-
     /**
      * Find string data after a start address and define it. Clears any conflicting
      * data.
      * 
      * @throws MemoryAccessException
      */
-    private Data findAndDefineString(AddressSet searchRange, String target) throws MemoryAccessException {
-        // TODO: findBytes input string can contain regex, escape any regex characters
+    private Data findAndDefineString(Address startAddr, Address stopAddr, String target) throws MemoryAccessException {
         byte[] utf8bytes = target.getBytes(StandardCharsets.UTF_8);
         int byteLen = utf8bytes.length;
 
-        String escapedString = escapedUtf8String(utf8bytes);
-
-        Address[] results = findBytes(searchRange, escapedString, 2, 1, false);
-        if (results == null || results.length == 0) {
+        Address result = currentProgram.getMemory().findBytes(startAddr, stopAddr, utf8bytes, null, true, null);
+        if (result == null) {
             if (verbose) {
                 println("Target string not found");
             }
             return null;
-        } else if (results.length > 1) {
+        }
+
+        Address dupStart = result.add(byteLen);
+        Address dupResult = currentProgram.getMemory().findBytes(dupStart, stopAddr, utf8bytes, null, true, null);
+        if (dupResult != null) {
             printf("More than one instance of target string \"%s\" found; skipping\n",
                     StringUtilities.convertControlCharsToEscapeSequences(target));
             return null;
         }
-
-        Address result = results[0];
 
         Data conflict = getDataAt(result);
         if (conflict != null &&
@@ -190,7 +181,6 @@ public class GoKnownStrings extends GhidraScript {
 
         Address strStart = golangInfo.getStringDataStart();
         Address strEnd = golangInfo.getStringDataEnd();
-        AddressSet searchRange = new AddressSet(strStart, strEnd);
 
         printf("loaded %d strings\n", KNOWN_STRINGS.size());
         printf("searching %s to %s\n", strStart.toString(), strEnd.toString());
@@ -202,7 +192,7 @@ public class GoKnownStrings extends GhidraScript {
         try {
             for (KnownString knownString : KNOWN_STRINGS) {
                 monitor.setMessage(knownString.name);
-                Data strData = findAndDefineString(searchRange, knownString.value);
+                Data strData = findAndDefineString(strStart, strEnd, knownString.value);
                 if (strData != null) {
                     println("Found and defined " + knownString.name);
                     printStringData(strData);
