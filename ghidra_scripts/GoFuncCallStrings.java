@@ -110,6 +110,12 @@ public class GoFuncCallStrings extends GoDynamicStrings {
     protected void detectFunctionStrings(HighFunction highFunc) {
         Function func = highFunc.getFunction();
 
+        if (!currentProgram.getCompilerSpec().getCompilerSpecID().getIdAsString().contains("golang")) {
+            final String warning = "WARNING: Program not loaded as golang binary; function call arguments may not be detected";
+            popup(warning);
+            println(warning);
+        }
+
         if (getVerbose() > 0)
             printf("local dynamic string header analysis of %s\n", GhostringsUtil.funcNameAndAddr(func));
 
