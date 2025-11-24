@@ -31,12 +31,10 @@
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import ghidra.program.model.address.Address;
-import ghidra.program.model.address.AddressOutOfBoundsException;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.pcode.PcodeOp;
@@ -51,6 +49,8 @@ import ghostrings.PcodeUtil;
 public class GoFuncCallStrings extends GoDynamicStrings {
 
     private static final String SIMPLIFICATION_STYLE = "normalize";
+
+    private boolean warningShown = false;
 
     @Override
     protected String getSimplificationStyle() {
@@ -110,7 +110,9 @@ public class GoFuncCallStrings extends GoDynamicStrings {
     protected void detectFunctionStrings(HighFunction highFunc) {
         Function func = highFunc.getFunction();
 
-        if (!currentProgram.getCompilerSpec().getCompilerSpecID().getIdAsString().contains("golang")) {
+        if (!currentProgram.getCompilerSpec().getCompilerSpecID().getIdAsString().contains("golang")
+                && !warningShown) {
+            warningShown = true;
             final String warning = "WARNING: Program not loaded as golang binary; function call arguments may not be detected";
             popup(warning);
             println(warning);
