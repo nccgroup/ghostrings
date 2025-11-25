@@ -128,14 +128,23 @@ public class GoStaticStrings extends GhidraScript {
         golangInfo = new GolangProgramInfo(this, true);
 
         List<MemoryBlock> roBlocks = golangInfo.getRoDataBlocks();
-        if (roBlocks == null) {
-            printf("Couldn't determine rodata blocks\n");
-            return;
+        if (roBlocks != null) {
+            for (MemoryBlock block : roBlocks) {
+                printf("Checking block %s\n", block.toString());
+                checkBlock(block);
+            }
+        } else {
+            printf("Couldn't determine .rodata blocks\n");
         }
 
-        for (MemoryBlock block : roBlocks) {
-            printf("Checking block %s\n", block.toString());
-            checkBlock(block);
+        List<MemoryBlock> dataBlocks = golangInfo.getDataBlocks();
+        if (dataBlocks != null) {
+            for (MemoryBlock block : dataBlocks) {
+                printf("Checking block %s\n", block.toString());
+                checkBlock(block);
+            }
+        } else {
+            printf("Couldn't determine .data blocks\n");
         }
     }
 

@@ -28,6 +28,14 @@ public class GolangProgramInfo {
         RODATA_BLOCK_NAMES.put(MachoLoader.MACH_O_NAME, "__rodata");
     }
 
+    private final static Map<String, String> DATA_BLOCK_NAMES;
+    static {
+        DATA_BLOCK_NAMES = new HashMap<>();
+        DATA_BLOCK_NAMES.put(ElfLoader.ELF_NAME, ".data");
+        DATA_BLOCK_NAMES.put(PeLoader.PE_NAME, ".data");
+        DATA_BLOCK_NAMES.put(MachoLoader.MACH_O_NAME, "__data");
+    }
+
     private final static Map<String, List<String>> GO_STRING_SYMBOLS;
     static {
         GO_STRING_SYMBOLS = new HashMap<>();
@@ -55,6 +63,7 @@ public class GolangProgramInfo {
 
     // Fields determined by program analysis
     private List<MemoryBlock> roDataBlocks;
+    private List<MemoryBlock> dataBlocks;
     private List<Symbol> goStringSymbols;
     private List<Symbol> goFuncSymbols;
     private AddressSet stringDataAddrSet;
@@ -76,6 +85,7 @@ public class GolangProgramInfo {
 
         // Initial analysis
         determineRoDataBlocks();
+        determineDataBlocks();
         determineGoSymbols();
         determineStringDataBounds();
     }
@@ -94,6 +104,14 @@ public class GolangProgramInfo {
 
     private void setRoDataBlocks(List<MemoryBlock> roDataBlocks) {
         this.roDataBlocks = roDataBlocks;
+    }
+
+    public List<MemoryBlock> getDataBlocks() {
+        return dataBlocks;
+    }
+
+    private void setDataBlocks(List<MemoryBlock> dataBlocks) {
+        this.dataBlocks = dataBlocks;
     }
 
     public List<Symbol> getGoStringSymbols() {
@@ -160,6 +178,22 @@ public class GolangProgramInfo {
 
         setRoDataBlocks(Arrays.stream(getFlatProgramAPI().getMemoryBlocks())
                 .filter(block -> block.getName().equals(roDataBlockName))
+                .collect(Collectors.toList()));
+    }
+
+    private void determineDataBlocks() {
+        String exeFormat = getExecutableFormat();
+        if (exeFormat == null) {
+            return;
+        }
+
+        String dataBlockName = DATA_BLOCK_NAMES.get(exeFormat);
+        if (dataBlockName == null) {
+            return;
+        }
+
+        setDataBlocks(Arrays.stream(getFlatProgramAPI().getMemoryBlocks())
+                .filter(block -> block.getName().equals(dataBlockName))
                 .collect(Collectors.toList()));
     }
 
