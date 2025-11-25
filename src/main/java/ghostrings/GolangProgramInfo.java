@@ -10,6 +10,9 @@ import ghidra.app.util.opinion.MachoLoader;
 import ghidra.app.util.opinion.PeLoader;
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressRange;
+import ghidra.program.model.address.AddressRangeImpl;
+import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.Symbol;
@@ -53,8 +56,7 @@ public class GolangProgramInfo {
     private MemoryBlock roDataBlock;
     private List<Symbol> goStringSymbols;
     private List<Symbol> goFuncSymbols;
-    private Address stringDataStart;
-    private Address stringDataEnd;
+    private AddressSet stringDataAddrSet;
 
     /**
      * Analyzes a Go binary to determine symbols, memory block names, and other
@@ -117,20 +119,12 @@ public class GolangProgramInfo {
         this.defaultExeFormatFallback = defaultExeFormatFallback;
     }
 
-    public Address getStringDataStart() {
-        return stringDataStart;
+    public AddressSet getStringDataAddrSet() {
+        return this.stringDataAddrSet;
     }
 
-    private void setStringDataStart(Address stringDataStart) {
-        this.stringDataStart = stringDataStart;
-    }
-
-    public Address getStringDataEnd() {
-        return stringDataEnd;
-    }
-
-    private void setStringDataEnd(Address stringDataEnd) {
-        this.stringDataEnd = stringDataEnd;
+    private void setStringDataAddrSet(AddressSet addrSet) {
+        this.stringDataAddrSet = addrSet;
     }
 
     private Program getProgram() {
@@ -226,8 +220,8 @@ public class GolangProgramInfo {
         // block
         if (GhostringsUtil.addrsInSameBlock(getProgram(), start, end) &&
                 start.compareTo(end) < 0) {
-            setStringDataStart(start);
-            setStringDataEnd(end);
+            AddressRange strRange = new AddressRangeImpl(start, end);
+            setStringDataAddrSet(new AddressSet(strRange));
         } else {
             throw new Exception("String boundary addresses fail sanity check");
         }
@@ -241,9 +235,7 @@ public class GolangProgramInfo {
      * @return True if the address doesn't violate known address boundaries
      */
     public boolean isAddrInStringData(Address addr) {
-        Address start = getStringDataStart();
-        Address end = getStringDataEnd();
-        return addr.compareTo(start) >= 0 && addr.compareTo(end) < 0;
+        return getStringDataAddrSet().contains(addr);
     }
 
 }
