@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import ghidra.app.util.opinion.ElfLoader;
 import ghidra.app.util.opinion.MachoLoader;
@@ -53,7 +54,7 @@ public class GolangProgramInfo {
     private boolean defaultExeFormatFallback;
 
     // Fields determined by program analysis
-    private MemoryBlock roDataBlock;
+    private List<MemoryBlock> roDataBlocks;
     private List<Symbol> goStringSymbols;
     private List<Symbol> goFuncSymbols;
     private AddressSet stringDataAddrSet;
@@ -74,7 +75,7 @@ public class GolangProgramInfo {
         setDefaultExeFormatFallback(allowDefaultFormat);
 
         // Initial analysis
-        determineRoDataBlock();
+        determineRoDataBlocks();
         determineGoSymbols();
         determineStringDataBounds();
     }
@@ -87,12 +88,12 @@ public class GolangProgramInfo {
         this.flatProgramAPI = flatProgramAPI;
     }
 
-    public MemoryBlock getRoDataBlock() {
-        return roDataBlock;
+    public List<MemoryBlock> getRoDataBlocks() {
+        return roDataBlocks;
     }
 
-    private void setRoDataBlock(MemoryBlock roDataBlock) {
-        this.roDataBlock = roDataBlock;
+    private void setRoDataBlocks(List<MemoryBlock> roDataBlocks) {
+        this.roDataBlocks = roDataBlocks;
     }
 
     public List<Symbol> getGoStringSymbols() {
@@ -146,7 +147,7 @@ public class GolangProgramInfo {
     /**
      * Find main read-only data block where string data is stored
      */
-    private void determineRoDataBlock() {
+    private void determineRoDataBlocks() {
         String exeFormat = getExecutableFormat();
         if (exeFormat == null) {
             return;
@@ -157,8 +158,9 @@ public class GolangProgramInfo {
             return;
         }
 
-        MemoryBlock roBlock = getProgram().getMemory().getBlock(roDataBlockName);
-        setRoDataBlock(roBlock);
+        setRoDataBlocks(Arrays.stream(getFlatProgramAPI().getMemoryBlocks())
+                .filter(block -> block.getName().equals(roDataBlockName))
+                .collect(Collectors.toList()));
     }
 
     /**
@@ -194,37 +196,36 @@ public class GolangProgramInfo {
 
         if (startSyms.size() == 1) {
             start = startSyms.get(0).getAddress();
-        }
 
-        if (endSyms.size() == 1) {
-            end = endSyms.get(0).getAddress();
+            if (endSyms.size() == 1) {
+                end = endSyms.get(0).getAddress();
+            } else {
+                // use end of the block start is in
+                end = getFlatProgramAPI().getMemoryBlock(start).getEnd();
+            }
+
+            // go.string must come before go.func, and they're expected to be in the same
+            // block
+            if (GhostringsUtil.addrsInSameBlock(getProgram(), start, end) &&
+                    start.compareTo(end) < 0) {
+                AddressRange strRange = new AddressRangeImpl(start, end);
+                setStringDataAddrSet(new AddressSet(strRange));
+                return;
+            }
+            throw new Exception("String boundary addresses fail sanity check");
         }
 
         // Use rodata fallback if necessary
-        if (start == null || end == null) {
-            MemoryBlock roBlock = getRoDataBlock();
-            if (roBlock == null) {
-                throw new Exception("Can't determine boundaries for string data");
-            }
-
-            if (start == null) {
-                start = roBlock.getStart();
-            }
-
-            if (end == null) {
-                end = roBlock.getEnd();
-            }
+        List<MemoryBlock> roBlocks = getRoDataBlocks();
+        if (roBlocks == null) {
+            throw new Exception("Can't determine boundaries for string data");
         }
 
-        // go.string must come before go.func, and they're expected to be in the same
-        // block
-        if (GhostringsUtil.addrsInSameBlock(getProgram(), start, end) &&
-                start.compareTo(end) < 0) {
-            AddressRange strRange = new AddressRangeImpl(start, end);
-            setStringDataAddrSet(new AddressSet(strRange));
-        } else {
-            throw new Exception("String boundary addresses fail sanity check");
+        AddressSet addrSet = new AddressSet();
+        for (MemoryBlock block : roBlocks) {
+            addrSet.add(block.getAddressRange());
         }
+        setStringDataAddrSet(addrSet);
     }
 
     /**

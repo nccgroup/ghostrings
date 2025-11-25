@@ -22,6 +22,8 @@
 //@menupath 
 //@toolbar 
 
+import java.util.List;
+
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressOutOfBoundsException;
@@ -125,13 +127,16 @@ public class GoStaticStrings extends GhidraScript {
 
         golangInfo = new GolangProgramInfo(this, true);
 
-        MemoryBlock roBlock = golangInfo.getRoDataBlock();
-        if (roBlock == null) {
-            printf("Couldn't determine rodata block\n");
+        List<MemoryBlock> roBlocks = golangInfo.getRoDataBlocks();
+        if (roBlocks == null) {
+            printf("Couldn't determine rodata blocks\n");
             return;
         }
 
-        checkBlock(roBlock);
+        for (MemoryBlock block : roBlocks) {
+            printf("Checking block %s\n", block.toString());
+            checkBlock(block);
+        }
     }
 
 }
