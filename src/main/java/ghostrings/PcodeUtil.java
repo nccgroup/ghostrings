@@ -171,6 +171,7 @@ public class PcodeUtil {
      * Check if output varnode is based on a stack register offset. Returns SP
      * offset or null.
      * 
+     * @param storeLoc STORE input1 - "varnode containing pointer offset [full address] of destination"
      * @throws UnhandledOpTypeException Op with stack register input has no handler
      * @throws UnhandledOpArgsException Unhandled inputs for op with stack input
      */
@@ -180,14 +181,23 @@ public class PcodeUtil {
         if (defineOp == null)
             return null;
 
-        // So far, it's always been INT_ADD
         switch (defineOp.getOpcode()) {
         case PcodeOp.INT_ADD:
             return intAddStackOffset(flatProgramAPI, defineOp);
+        /*
+        case PcodeOp.LOAD:
+            // TODO: ensure stack register is used in this somehow
+            List<Long> constants = PcodeUtil.getConstantInputs(flatProgramAPI, storeLoc);
+            if (constants.size() == 1) {
+                return constants.get(0);
+            }
+            // TODO: handle multiple
+            break;
+        */
         }
 
         // TODO: Could have a MULTIEQUAL here with an input that's
-        // a stack register defined by an INT_ADD (sp, offset)
+        // a stack offset defined by an INT_ADD (sp, offset)
 
         // The only use for this is to detect unhandled cases
         if (hasStackInput(flatProgramAPI.getCurrentProgram(), defineOp)) {
@@ -305,6 +315,8 @@ public class PcodeUtil {
                 break;
             }
         }
+
+        // TODO: handle INT_ADD, ...
 
         return results;
     }
