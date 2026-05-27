@@ -17,10 +17,12 @@
  */
 package ghostrings;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import ghidra.program.flatapi.FlatProgramAPI;
 import ghidra.program.model.address.Address;
@@ -189,26 +191,37 @@ public class PcodeUtil {
 
         // The only use for this is to detect unhandled cases
         if (hasStackInput(flatProgramAPI.getCurrentProgram(), defineOp)) {
-            throw new UnhandledOpTypeException("Unhandled op has stack register input: " + defineOp);
+            throw new UnhandledOpTypeException("Unhandled op @ " + defineOp.getSeqnum().getTarget().toString() + " has stack register input: " + defineOp);
         }
 
         return null;
     }
 
-    /** Get the source/dest address from a LOAD/STORE op */
-    public static Address getLoadStoreAddr(PcodeOp op, AddressFactory addrFactory) {
+    /** Get the source/dest address from a LOAD/STORE op (may resolve to multiple possible values)
+     * @throws UnhandledOpArgsException */
+    public static List<Address> getLoadStoreAddrs(FlatProgramAPI flatProgramAPI, PcodeOp op, AddressFactory addrFactory, long depth) throws UnhandledOpArgsException {
         if (op.getOpcode() != PcodeOp.STORE && op.getOpcode() != PcodeOp.LOAD)
             throw new IllegalArgumentException("Must be STORE or LOAD op");
 
+        if (!op.getInput(0).isConstant()) {
+            throw new UnhandledOpArgsException("space ID must be a constant");
+        }
+
         int spaceId = (int) op.getInput(0).getOffset();
-        long offset = op.getInput(1).getOffset();
+
+        // this can be something other than a constant, e.g. a register
+        List<Long> offsets = PcodeUtil.getConstantInputs(flatProgramAPI, op.getInput(1), depth);
 
         // TODO: "If the wordsize attribute of the space given by the ID is bigger than
         // one, the offset into the space obtained from input1 must be multiplied by
         // this value in order to obtain the correct byte offset into the space."
 
-        Address loadAddr = addrFactory.getAddress(spaceId, offset);
-        return loadAddr;
+        List<Address> loadAddrs = offsets.stream()
+                .distinct()
+                .map(offset -> addrFactory.getAddress(spaceId, offset))
+                .collect(Collectors.toList());
+
+        return loadAddrs;
     }
 
     /**
@@ -238,26 +251,35 @@ public class PcodeUtil {
 
         if (varnode.isConstant()) {
             results.add(varnode.getOffset());
-        } else if (varnode.isRegister() && def != null) {
+        } else if (def != null) {
             // Register may hold a constant
             switch (def.getOpcode()) {
             case PcodeOp.LOAD:
                 // Check for LOAD op that loaded a constant into the register,
                 // e.g. getting address from constant pool in ARM 32
                 Program program = programAPI.getCurrentProgram();
-                Address loadFrom = getLoadStoreAddr(def, program.getAddressFactory());
-                Data dataLoaded = programAPI.getDataAt(loadFrom);
-                if (dataLoaded != null) {
-                    if (dataLoaded.isConstant()) {
-                        Long constantValue = (Long) dataLoaded.getValue();
-                        if (constantValue != null) {
-                            results.add(constantValue);
-                        }
-                    } else if (dataLoaded.isPointer()) {
-                        // If the data is a pointer, return its address as a constant
-                        Address addrVal = (Address) dataLoaded.getValue();
-                        if (addrVal != null) {
-                            results.add(addrVal.getOffset());
+                List<Address> loadFromAddrs;
+                try {
+                    loadFromAddrs = getLoadStoreAddrs(programAPI, def, program.getAddressFactory(), depth + 1);
+                } catch (UnhandledOpArgsException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    break;
+                }
+                for (Address loadFrom : loadFromAddrs) {
+                    Data dataLoaded = programAPI.getDataAt(loadFrom);
+                    if (dataLoaded != null) {
+                        if (dataLoaded.isConstant()) {
+                            Long constantValue = (Long) dataLoaded.getValue();
+                            if (constantValue != null) {
+                                results.add(constantValue);
+                            }
+                        } else if (dataLoaded.isPointer()) {
+                            // If the data is a pointer, return its address as a constant
+                            Address addrVal = (Address) dataLoaded.getValue();
+                            if (addrVal != null) {
+                                results.add(addrVal.getOffset());
+                            }
                         }
                     }
                 }
@@ -275,10 +297,12 @@ public class PcodeUtil {
                     results.addAll(getConstantInputs(programAPI, multiInput, depth + 1));
                 }
                 break;
-            }
-        } else if (def != null && def.getOpcode() == PcodeOp.PIECE) {
-            for (Varnode pieceInput: def.getInputs()) {
-                results.addAll(getConstantInputs(programAPI, pieceInput, depth + 1));
+
+            case PcodeOp.PIECE:
+                for (Varnode pieceInput: def.getInputs()) {
+                    results.addAll(getConstantInputs(programAPI, pieceInput, depth + 1));
+                }
+                break;
             }
         }
 
